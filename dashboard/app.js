@@ -13,19 +13,24 @@ const MOON =
   '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
 
 const themeBtn = document.querySelector("[data-theme-toggle]");
-const THEME_KEY = "ipeds-explorer:theme";
+// Theme choice is kept in the URL hash rather than web storage: the preview
+// sandbox blocks web storage, and a hash also makes a chosen theme shareable.
+function readThemeFromHash() {
+  const m = /(?:^|[#&])theme=(dark|light)\b/.exec(location.hash);
+  return m ? m[1] : null;
+}
 
-function readStoredTheme() {
-  try {
-    const v = localStorage.getItem(THEME_KEY);
-    return v === "dark" || v === "light" ? v : null;
-  } catch (err) {
-    return null; // private-mode or blocked storage
-  }
+function writeThemeToHash(value) {
+  const parts = location.hash
+    .replace(/^#/, "")
+    .split("&")
+    .filter((part) => part && !part.startsWith("theme="));
+  parts.push("theme=" + value);
+  history.replaceState(null, "", "#" + parts.join("&"));
 }
 
 let theme =
-  readStoredTheme() ||
+  readThemeFromHash() ||
   (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 
 function paintThemeButton() {
@@ -42,11 +47,7 @@ paintThemeButton();
 themeBtn.addEventListener("click", () => {
   theme = theme === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", theme);
-  try {
-    localStorage.setItem(THEME_KEY, theme);
-  } catch (err) {
-    /* storage unavailable — theme still applies for this session */
-  }
+  writeThemeToHash(theme);
   paintThemeButton();
   renderAll();
 });

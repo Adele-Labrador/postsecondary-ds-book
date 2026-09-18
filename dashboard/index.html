@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPEDS Explorer — Postsecondary Metrics Dashboard</title>
+    <meta
+      name="description"
+      content="Interactive dashboard over real IPEDS institutional data: enrollment, completion, selectivity, affordability and peer groups for 3,700+ US degree-granting institutions."
+    />
+
+    <link rel="preconnect" href="https://api.fontshare.com" />
+    <link
+      href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <!-- ── Sidebar ───────────────────────────────────────────────── -->
+      <aside class="sidebar" id="sidebar" aria-label="Filters">
+        <div class="brand">
+          <svg
+            class="brand__mark"
+            viewBox="0 0 32 32"
+            fill="none"
+            aria-label="IPEDS Explorer logo"
+            role="img"
+          >
+            <rect
+              x="2"
+              y="19"
+              width="6"
+              height="11"
+              rx="1"
+              fill="currentColor"
+            />
+            <rect
+              x="10"
+              y="13"
+              width="6"
+              height="17"
+              rx="1"
+              fill="currentColor"
+              opacity="0.62"
+            />
+            <rect
+              x="18"
+              y="7"
+              width="6"
+              height="23"
+              rx="1"
+              fill="currentColor"
+              opacity="0.38"
+            />
+            <circle
+              cx="27"
+              cy="6"
+              r="4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+            />
+          </svg>
+          <div class="brand__text">
+            <span class="brand__name">IPEDS Explorer</span>
+            <span class="brand__sub">Postsecondary metrics</span>
+          </div>
+        </div>
+
+        <div class="sidebar__scroll">
+          <div class="field">
+            <label class="field__label" for="search">Search institution</label>
+            <div class="field__searchwrap">
+              <svg viewBox="0 0 24 24" class="field__icon" aria-hidden="true">
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="7"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+                <path
+                  d="M16.5 16.5 21 21"
+                  stroke="currentColor"
+                  stroke-width="2"
+                />
+              </svg>
+              <input
+                id="search"
+                type="search"
+                class="input input--search"
+                placeholder="Name, city or state"
+                autocomplete="off"
+              />
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="field__label">Control</span>
+            <div
+              class="chipset"
+              id="f-control"
+              role="group"
+              aria-label="Control"
+            ></div>
+          </div>
+
+          <div class="field">
+            <span class="field__label">Carnegie family</span>
+            <div
+              class="chipset"
+              id="f-family"
+              role="group"
+              aria-label="Carnegie family"
+            ></div>
+          </div>
+
+          <div class="field">
+            <label class="field__label" for="f-state">State</label>
+            <select id="f-state" class="input"></select>
+          </div>
+
+          <div class="field">
+            <div class="field__labelrow">
+              <label class="field__label" for="f-fte"
+                >Minimum undergrad FTE</label
+              >
+              <output class="field__out" id="f-fte-out">0</output>
+            </div>
+            <input
+              id="f-fte"
+              type="range"
+              class="range"
+              min="0"
+              max="4"
+              step="0.05"
+              value="0"
+            />
+            <div class="range__ticks">
+              <span>0</span><span>100</span><span>1k</span><span>10k</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="field__label">Reported data required</span>
+            <div
+              class="chipset chipset--wrap"
+              id="f-require"
+              role="group"
+              aria-label="Require reported metrics"
+            ></div>
+          </div>
+
+          <button class="btn btn--ghost btn--block" id="reset">
+            Reset filters
+          </button>
+
+          <div class="sidebar__note">
+            <strong id="note-count">—</strong> of
+            <span id="note-total">—</span> institutions match. Universe:
+            degree-granting institutions reporting undergraduate FTE in
+            <span id="note-year">—</span>.
+          </div>
+        </div>
+      </aside>
+
+      <!-- ── Header ────────────────────────────────────────────────── -->
+      <header class="header">
+        <button
+          class="btn btn--icon header__menu"
+          id="menu"
+          aria-label="Show filters"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <path d="M4 7h16M4 12h16M4 17h10" />
+          </svg>
+        </button>
+        <div class="header__titles">
+          <h1 class="header__title">Institutional metrics explorer</h1>
+          <p class="header__meta">
+            Real IPEDS data ·
+            <span id="hdr-year">—</span> ·
+            <span id="hdr-count">—</span> institutions
+          </p>
+        </div>
+        <div class="header__chips" id="active-chips" aria-live="polite"></div>
+        <div class="header__actions">
+          <button class="btn btn--ghost" id="export">Export CSV</button>
+          <button
+            class="btn btn--icon"
+            data-theme-toggle
+            aria-label="Switch to light mode"
+          ></button>
+        </div>
+      </header>
+
+      <!-- ── Main ──────────────────────────────────────────────────── -->
+      <main class="main" id="main">
+        <section class="kpis" id="kpis" aria-label="Key metrics"></section>
+
+        <section class="card card--tall">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">Metric relationships</h2>
+              <p class="card__sub" id="scatter-sub">
+                Each dot is one institution
+              </p>
+            </div>
+            <div class="card__controls">
+              <label class="sel">
+                <span>Y</span>
+                <select id="axis-y" class="input input--sm"></select>
+              </label>
+              <label class="sel">
+                <span>X</span>
+                <select id="axis-x" class="input input--sm"></select>
+              </label>
+            </div>
+          </div>
+          <div class="legend" id="scatter-legend"></div>
+          <div class="chartbox chartbox--scatter">
+            <canvas id="scatter"></canvas>
+          </div>
+          <p class="card__foot">
+            Dot area scales with undergraduate FTE. Click any dot to open its
+            institution profile.
+          </p>
+        </section>
+
+        <div class="grid2">
+          <section class="card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Enrollment trend &amp; forecast</h2>
+                <p class="card__sub" id="trend-sub">
+                  Aggregate undergraduate FTE
+                </p>
+              </div>
+            </div>
+            <div class="chartbox">
+              <canvas id="trend"></canvas>
+            </div>
+            <p class="card__foot" id="trend-foot"></p>
+          </section>
+
+          <section class="card">
+            <div class="card__head">
+              <div>
+                <h2 class="card__title">Distribution</h2>
+                <p class="card__sub" id="dist-sub">By control</p>
+              </div>
+              <div class="card__controls">
+                <label class="sel">
+                  <span>Metric</span>
+                  <select id="dist-metric" class="input input--sm"></select>
+                </label>
+              </div>
+            </div>
+            <div class="chartbox">
+              <canvas id="dist"></canvas>
+            </div>
+            <p class="card__foot" id="dist-foot"></p>
+          </section>
+        </div>
+
+        <section class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">Geography</h2>
+              <p class="card__sub" id="map-sub">Institution locations</p>
+            </div>
+            <div class="card__controls">
+              <label class="sel">
+                <span>Shade by</span>
+                <select id="map-metric" class="input input--sm"></select>
+              </label>
+            </div>
+          </div>
+          <div class="mapbox" id="mapbox">
+            <svg id="map" role="img" aria-label="Map of US institutions"></svg>
+            <div class="maptip" id="maptip" hidden></div>
+          </div>
+          <div class="legend legend--scale" id="map-legend"></div>
+        </section>
+
+        <section class="card">
+          <div class="card__head">
+            <div>
+              <h2 class="card__title">Institution table</h2>
+              <p class="card__sub" id="table-sub">
+                Sortable · click a row for detail
+              </p>
+            </div>
+            <div class="card__controls">
+              <span class="muted mono" id="table-showing"></span>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table class="table" id="table">
+              <thead id="thead"></thead>
+              <tbody id="tbody"></tbody>
+            </table>
+          </div>
+          <div class="card__footrow">
+            <button class="btn btn--ghost" id="more">Show 100 more</button>
+          </div>
+        </section>
+
+        <footer class="foot">
+          <h2 class="foot__title">Sources &amp; method</h2>
+          <p>
+            All figures are real IPEDS data, retrieved from the
+            <a
+              href="https://educationdata.urban.org/documentation/colleges.html"
+              target="_blank"
+              rel="noopener"
+              >Urban Institute Education Data Portal</a
+            >, which republishes
+            <a href="https://nces.ed.gov/ipeds/" target="_blank" rel="noopener"
+              >NCES IPEDS</a
+            >
+            survey components. Components used: directory and Carnegie
+            classification, 12-month enrollment (undergraduate FTE),
+            student-to-faculty ratio, admissions, graduation rates (150% of
+            normal time), fall retention, academic-year tuition, and student
+            financial aid. See
+            <a
+              href="https://nces.ed.gov/ipeds/survey-components"
+              target="_blank"
+              rel="noopener"
+              >IPEDS survey components</a
+            >
+            for definitions and
+            <a
+              href="https://carnegieclassifications.acenet.edu/"
+              target="_blank"
+              rel="noopener"
+              >the Carnegie Classification</a
+            >
+            for the institution taxonomy.
+          </p>
+          <ul class="foot__list">
+            <li>
+              <strong>Vintage.</strong> Enrollment, completion, selectivity,
+              retention and tuition are
+              <span class="mono" id="foot-year">—</span>. Financial-aid figures
+              lag one year in the portal and are
+              <span class="mono" id="foot-aidyear">—</span>.
+            </li>
+            <li>
+              <strong>Missing data.</strong> IPEDS suppresses or omits metrics
+              that do not apply to an institution — open-admission colleges
+              report no admit rate, and graduation rates require a qualifying
+              cohort. Blank cells mean not reported, never zero. Medians are
+              computed over reporting institutions only.
+            </li>
+            <li>
+              <strong>Peer groups.</strong> Peers are the nearest institutions
+              in standardized space over log FTE, student-to-faculty ratio, Pell
+              share and in-state tuition, restricted to the same control and
+              Carnegie family — the peer-group method used in
+              <a
+                href="https://github.com/Adele-Labrador/postsecondary-ds-book"
+                target="_blank"
+                rel="noopener"
+                >the companion repository</a
+              >.
+            </li>
+            <li>
+              <strong>Forecast.</strong> The dashed trend line is an ordinary
+              least-squares fit on aggregate FTE for the current filter,
+              extended three years. It is a descriptive trend, not a causal or
+              institution-level projection.
+            </li>
+          </ul>
+        </footer>
+      </main>
+
+      <!-- Dims the page behind the off-canvas filter panel on narrow screens. -->
+      <div class="scrim scrim--sidebar" id="sidebar-scrim" hidden></div>
+
+      <!-- ── Detail drawer ─────────────────────────────────────────── -->
+      <div class="scrim" id="scrim" hidden></div>
+      <aside class="drawer" id="drawer" aria-label="Institution detail" hidden>
+        <div class="drawer__inner" id="drawer-inner"></div>
+      </aside>
+    </div>
+
+    <div class="loading" id="loading">
+      <div class="loading__bar"></div>
+      <p class="loading__text">Loading IPEDS panel…</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-array@3/dist/d3-array.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-geo@3/dist/d3-geo.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

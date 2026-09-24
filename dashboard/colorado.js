@@ -68,9 +68,10 @@ const NA = '<span class="na">—</span>';
 function money(v, digits) {
   if (v == null || !isFinite(v)) return "—";
   const a = Math.abs(v);
-  if (a >= 1e9) return "$" + (v / 1e9).toFixed(digits ?? 2) + "B";
-  if (a >= 1e6) return "$" + (v / 1e6).toFixed(digits ?? 1) + "M";
-  return "$" + Math.round(v).toLocaleString("en-US");
+  const sg = v < 0 ? "-" : "";
+  if (a >= 1e9) return sg + "$" + (a / 1e9).toFixed(digits ?? 2) + "B";
+  if (a >= 1e6) return sg + "$" + (a / 1e6).toFixed(digits ?? 1) + "M";
+  return sg + "$" + Math.round(a).toLocaleString("en-US");
 }
 const int = (v) => (v == null ? "—" : Math.round(v).toLocaleString("en-US"));
 function pct(v, digits = 1) {
@@ -127,6 +128,10 @@ const state = {
   dollars: "real",
   unit: null,
   basis: "salaries",
+  aud: null,
+  audEntity: "cub",
+  audView: "per",
+  guideStep: 0,
 };
 const charts = {};
 
@@ -310,16 +315,27 @@ const groupColor = (i) => css("--co-" + i);
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 async function boot() {
-  const [data, fin] = await Promise.all([
-    fetch("data/colorado.json").then((r) => r.json()),
-    fetch("data/colorado_finance.json")
+  const optional = (url) =>
+    fetch(url)
       .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null),
+      .catch(() => null);
+  const [data, fin, aud] = await Promise.all([
+    fetch("data/colorado.json").then((r) => r.json()),
+    optional("data/colorado_finance.json"),
+    optional("data/colorado_audited.json"),
   ]);
   state.data = data;
   state.fin = fin;
+  state.aud = aud;
   if (fin) setupFinance();
   else document.getElementById("fin").hidden = true;
+  if (aud) setupAudited();
+  const gjump = document.getElementById("guide-jump");
+  gjump.hidden = !aud;
+  gjump.addEventListener("click", (e) => {
+    e.preventDefault();
+    jumpTo("guide", "guide", "#guide-entity");
+  });
   const jump = document.getElementById("fin-jump");
   jump.hidden = !fin;
   // #main scrolls internally and the hash holds panel state, so scroll in JS
@@ -357,8 +373,15 @@ async function boot() {
   renderFoot();
   renderAll();
   syncLinks();
-  if (fin && hashGet("section") === "finances")
+  const section = hashGet("section");
+  if (fin && section === "finances")
     requestAnimationFrame(() => jumpToFinance(true));
+  if (aud && section === "audited" && audVisible())
+    requestAnimationFrame(() => jumpTo("aud", "audited", "#aud-entity", true));
+  if (aud && section === "guide")
+    requestAnimationFrame(() =>
+      jumpTo("guide", "guide", "#guide-entity", true),
+    );
   const loader = document.getElementById("loading");
   loader.classList.add("loading--out");
   setTimeout(() => (loader.hidden = true), 320);
@@ -383,6 +406,8 @@ function renderAll() {
   renderPer();
   renderTable();
   renderFinance();
+  renderAudited();
+  renderGuide();
 }
 
 /* ── KPIs ──────────────────────────────────────────────────────────────── */
@@ -1147,23 +1172,33 @@ function setupFinance() {
   state.basis = hashGet("basis") === "total" ? "total" : "salaries";
 }
 
-function jumpToFinance(instant) {
+function jumpTo(id, section, focusSel, instant) {
   const main = document.getElementById("main");
-  const target = document.getElementById("fin");
+  const target = document.getElementById(id);
   const top =
     target.getBoundingClientRect().top -
     main.getBoundingClientRect().top +
     main.scrollTop -
     12;
   main.scrollTo({ top, behavior: instant ? "auto" : "smooth" });
-  target.querySelector("#fin-unit").focus({ preventScroll: true });
-  hashSet("section", "finances");
+  target.querySelector(focusSel).focus({ preventScroll: true });
+  hashSet("section", section);
+}
+function jumpToFinance(instant) {
+  jumpTo("fin", "finances", "#fin-unit", instant);
 }
 
 function setUnit(id) {
   state.unit = id;
   hashSet("campus", String(id));
   renderFinance();
+  // Follow the IPEDS campus into the audited layer when it has a match.
+  if (state.aud && AUD_BY_UNIT[id] && AUD_BY_UNIT[id] !== state.audEntity) {
+    state.audEntity = AUD_BY_UNIT[id];
+    hashSet("aud", state.audEntity);
+    renderAudited();
+    renderGuide();
+  }
 }
 
 function renderFinance() {
@@ -1477,6 +1512,818 @@ function renderFinFoot() {
     " Colorado routes state support through College Opportunity Fund stipends, which campuses book as tuition, and fee-for-service contracts, booked as state grants and contracts, so IPEDS cannot isolate formula funding. " +
     "PERA pension accounting puts large non-cash swings into benefits, so the salaries view is the steadier trend. " +
     "CU Denver | Anschutz and CSU Fort Collins include medical and veterinary schools. Click a bar or row to change campus.";
+}
+
+/* ── Audited statements layer (CU and CSU, FY2023-24 and FY2024-25) ───── */
+// The boards' own annual financial reports are a year ahead of IPEDS. They
+// stay a separate layer: GASB statement lines are not IPEDS F1A lines, so the
+// only change shown is between the two years each report carries.
+const AUD_REV = [
+  { key: "tuitionFeesNet", label: "Net tuition & fees", color: 0 },
+  { key: "feeForService", label: "Fee-for-service", color: 1 },
+  { key: "grants", label: "Grants & contracts", color: 2 },
+  { key: "auxiliaryRevenue", label: "Auxiliary", color: 3 },
+  { key: "healthServicesRevenue", label: "Health services", color: 4 },
+  { key: "otherRev", label: "Sales & other", color: 6 },
+];
+const AUD_EXP = [
+  ["instruction", "Instruction"],
+  ["research", "Research"],
+  ["publicService", "Public service"],
+  ["academicSupport", "Academic support"],
+  ["studentServices", "Student services"],
+  ["institutionalSupport", "Institutional support"],
+  ["operationMaintenance", "Operation & maintenance"],
+  ["scholarships", "Scholarships & aid"],
+  ["auxiliaryExpense", "Auxiliary"],
+  ["healthServices", "Health services"],
+  ["depreciation", "Depreciation"],
+  ["otherExpense", "Other"],
+];
+const AUD_BY_UNIT = {
+  126614: "cub",
+  126580: "uccs",
+  126562: "ucd",
+  126818: "csu",
+  128106: "csu",
+};
+const AUD_SHORT = {
+  cub: "CU Boulder",
+  uccs: "UCCS",
+  ucd: "CU Denver | Anschutz",
+  cusys: "CU System office",
+  cu: "CU (all campuses)",
+  csu: "CSU System",
+};
+
+function audYears() {
+  return state.aud.meta.years;
+}
+function audEntity(id) {
+  return state.aud.entities.find((e) => e.id === (id || state.audEntity));
+}
+function audFactor(i) {
+  if (state.dollars === "nominal") return 1;
+  return state.data.meta.deflator[audYears()[i]] || 1;
+}
+// Value in the page's dollars; "otherRev" is derived.
+function audRaw(e, key, i) {
+  const v = e.values;
+  if (key === "otherRev")
+    return (
+      v.salesServices[i] + v.otherOperating[i] - v.healthServicesRevenue[i]
+    );
+  return v[key] ? v[key][i] : null;
+}
+function audVal(e, key, i, view) {
+  const raw = audRaw(e, key, i);
+  if (raw == null) return null;
+  const d = raw * audFactor(i);
+  if ((view || state.audView) === "total") return d;
+  const f = e.fte && e.fte[i];
+  return f ? d / f : null;
+}
+function audEntities() {
+  const all = state.aud.entities;
+  if (state.board === "ALL") return all;
+  return all.filter((e) => e.board === state.board);
+}
+function audVisible() {
+  return !!state.aud && (state.board === "ALL" || SPECIALTY.has(state.board));
+}
+
+function setupAudited() {
+  const opts = (list) =>
+    list
+      .map(
+        (e) =>
+          '<option value="' +
+          e.id +
+          '">' +
+          escapeHtml(AUD_SHORT[e.id] || e.name) +
+          "</option>",
+      )
+      .join("");
+  const ids = state.aud.entities.map((e) => e.id);
+  const h = hashGet("aud");
+  state.audEntity = ids.includes(h) ? h : AUD_BY_UNIT[state.unit] || "cub";
+  state.audView = hashGet("audview") === "total" ? "total" : "per";
+  state.guideStep = 0;
+
+  const sel = document.getElementById("aud-entity");
+  sel.addEventListener("change", () => setAudEntity(sel.value));
+  sel.dataset.opts = "";
+  document.querySelectorAll("[data-aud-view]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      state.audView = btn.dataset.audView;
+      hashSet("audview", state.audView === "per" ? null : state.audView);
+      renderAudited();
+    }),
+  );
+  // The guide skips the system office, which has no students or tuition.
+  const gsel = document.getElementById("guide-entity");
+  gsel.innerHTML = opts(state.aud.entities.filter((e) => e.fte));
+  gsel.addEventListener("change", () => setAudEntity(gsel.value));
+  document.getElementById("guide-prev").addEventListener("click", () => {
+    setGuideStep(state.guideStep - 1);
+  });
+  document.getElementById("guide-next").addEventListener("click", () => {
+    setGuideStep(state.guideStep + 1);
+  });
+  document.getElementById("guide-steps").innerHTML = GUIDE_STEPS.map(
+    (s, i) =>
+      '<li><button class="guide__step" data-step="' +
+      i +
+      '"><span class="guide__num">' +
+      (i + 1) +
+      "</span>" +
+      escapeHtml(s.pill) +
+      "</button></li>",
+  ).join("");
+  document
+    .querySelectorAll(".guide__step")
+    .forEach((b) =>
+      b.addEventListener("click", () => setGuideStep(Number(b.dataset.step))),
+    );
+  document.getElementById("guide").hidden = false;
+}
+
+function setAudEntity(id) {
+  state.audEntity = id;
+  hashSet("aud", id);
+  renderAudited();
+  renderGuide();
+}
+
+function renderAudited() {
+  const card = document.getElementById("aud");
+  if (!state.aud) return;
+  card.hidden = !audVisible();
+  if (card.hidden) return;
+  const list = audEntities();
+  const sel = document.getElementById("aud-entity");
+  const key = list.map((e) => e.id).join(",");
+  if (sel.dataset.opts !== key) {
+    sel.innerHTML = list
+      .map(
+        (e) =>
+          '<option value="' +
+          e.id +
+          '">' +
+          escapeHtml(AUD_SHORT[e.id] || e.name) +
+          "</option>",
+      )
+      .join("");
+    sel.dataset.opts = key;
+  }
+  if (!list.some((e) => e.id === state.audEntity)) state.audEntity = list[0].id;
+  // Per-FTE is meaningless for the CU system office (no students).
+  const e = audEntity();
+  if (!e.fte && state.audView === "per") state.audView = "total";
+  sel.value = state.audEntity;
+  document.querySelectorAll("[data-aud-view]").forEach((btn) => {
+    const on = btn.dataset.audView === state.audView;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-checked", on ? "true" : "false");
+    btn.disabled = btn.dataset.audView === "per" && !e.fte;
+  });
+  const yrs = audYears().map(shortFy);
+  document.getElementById("aud-year").textContent = yrs[1];
+  document.getElementById("aud-sub").textContent =
+    (state.board === "ALL" ? "CU and CSU" : state.board) +
+    " annual financial reports · " +
+    yrs[0] +
+    " vs " +
+    yrs[1] +
+    " · " +
+    (state.audView === "per" ? "per FTE, " : "") +
+    dollarsLabel();
+  const name = AUD_SHORT[e.id] || e.name;
+  document.getElementById("aud-rev-h").textContent =
+    name + " · operating revenue" + (state.audView === "per" ? " per FTE" : "");
+  document.getElementById("aud-exp-h").textContent =
+    name +
+    " · operating expenses" +
+    (state.audView === "per" ? " per FTE" : "");
+  document.getElementById("aud-legend").innerHTML = legendHtml([
+    { label: yrs[0], color: css("--co-6") },
+    { label: yrs[1], color: css("--co-0") },
+  ]);
+  renderAudBars(
+    "audRev",
+    "aud-rev",
+    "aud-rev-box",
+    e,
+    AUD_REV.map((p) => [p.key, p.label]),
+  );
+  renderAudBars("audExp", "aud-exp", "aud-exp-box", e, AUD_EXP);
+  renderAudStats(e);
+  renderAudTable(list);
+  renderAudFoot();
+}
+
+function renderAudBars(chartKey, canvasId, boxId, e, parts) {
+  destroy(chartKey);
+  const base = chartBase();
+  const rows = parts.filter(([k]) =>
+    [0, 1].some((i) => Math.abs(audRaw(e, k, i) || 0) >= 5e5),
+  );
+  document.getElementById(boxId).style.height =
+    Math.max(9, rows.length * 2.1 + 3) + "rem";
+  const per = state.audView === "per";
+  const fmt = (v) =>
+    per
+      ? "$" + (Math.abs(v) >= 1000 ? (v / 1000).toFixed(0) + "k" : v)
+      : axisMoney(Math.abs(v)).replace("$", v < 0 ? "−$" : "$");
+  charts[chartKey] = new Chart(document.getElementById(canvasId), {
+    type: "bar",
+    data: {
+      labels: rows.map(([, l]) => l),
+      datasets: [0, 1].map((i) => ({
+        label: shortFy(audYears()[i]),
+        data: rows.map(([k]) => audVal(e, k, i)),
+        backgroundColor: css(i ? "--co-0" : "--co-6") + (i ? "" : "99"),
+        barPercentage: 0.85,
+        categoryPercentage: 0.8,
+      })),
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...base.tooltip,
+          callbacks: {
+            label: (c) =>
+              " " +
+              c.dataset.label +
+              ": " +
+              (per
+                ? "$" + Math.round(c.parsed.x).toLocaleString("en-US")
+                : money(c.parsed.x)),
+            footer: (items) => {
+              const [k] = rows[items[0].dataIndex];
+              const ch = change(audVal(e, k, 0), audVal(e, k, 1));
+              return ch == null ? "" : "Change: " + pct(ch);
+            },
+          },
+        },
+      },
+      scales: {
+        x: axis(base, per ? "per FTE" : null, fmt),
+        y: axis(base, null, undefined, {
+          grid: { display: false },
+          ticks: {
+            color: base.text,
+            autoSkip: false,
+            font: { family: "'Satoshi', sans-serif", size: 11 },
+          },
+        }),
+      },
+    },
+  });
+}
+
+function audDelta(a, b) {
+  const v = change(a, b);
+  if (v == null || !isFinite(v) || a <= 0) return NA;
+  if (Math.abs(v) < 0.0005) return "0.0%";
+  return (
+    '<span class="' +
+    (v > 0.005 ? "pos" : v < -0.005 ? "neg" : "") +
+    '">' +
+    pct(v) +
+    "</span>"
+  );
+}
+
+function audMoney(v) {
+  if (v == null) return "—";
+  return state.audView === "per" ? money(v) : money(v);
+}
+
+function renderAudStats(e) {
+  const i = 1;
+  const t = (k) => audVal(e, k, i, "total");
+  const rev = t("operatingRevenue");
+  const gross = t("tuitionFeesGross");
+  const disc = gross ? t("allowance") / gross : null;
+  const cells = [
+    [
+      "Operating revenue",
+      money(rev),
+      audDelta(audVal(e, "operatingRevenue", 0, "total"), rev),
+    ],
+    [
+      "Operating result",
+      money(t("operatingIncome")),
+      rev ? pct(t("operatingIncome") / rev) + " of revenue" : "",
+    ],
+    ["Nonoperating, net", money(t("nonoperating")), "Pell " + money(t("pell"))],
+    [
+      "Tuition discount",
+      disc == null ? "—" : Math.round(disc * 100) + "%",
+      gross ? "allowance " + money(t("allowance")) : "",
+    ],
+    [
+      "FTE " + shortFy(audYears()[i]),
+      e.fte ? int(e.fte[i]) : "—",
+      e.fte ? audDelta(e.fte[0], e.fte[1]) + " vs prior" : "no students",
+    ],
+  ];
+  document.getElementById("aud-stats").innerHTML = cells
+    .map(
+      ([k, v, n]) =>
+        "<div><dt>" +
+        escapeHtml(k) +
+        "</dt><dd>" +
+        v +
+        (n ? ' <span class="fin__note">' + n + "</span>" : "") +
+        "</dd></div>",
+    )
+    .join("");
+}
+
+function renderAudTable(list) {
+  const per = state.audView === "per";
+  const yN = shortFy(audYears()[1]);
+  const y0 = shortFy(audYears()[0]);
+  const cols = [
+    ["operatingRevenue", "Operating revenue"],
+    ["tuitionFeesNet", "Net tuition & fees"],
+    ["operatingExpense", "Operating expenses"],
+    ["instruction", "Instruction"],
+    ["studentServices", "Student services"],
+  ];
+  const tail = per ? " / FTE" : "";
+  document.querySelector("#aud-table thead").innerHTML =
+    "<tr><th>Entity</th><th class='num'>FTE " +
+    yN +
+    "</th>" +
+    cols
+      .map(
+        ([, l]) =>
+          "<th class='num'>" +
+          escapeHtml(l) +
+          tail +
+          "</th><th class='num'>vs " +
+          y0 +
+          "</th>",
+      )
+      .join("") +
+    "<th class='num'>Pell (total)</th></tr>";
+  const rows = list.filter((e) => !per || e.fte);
+  document.getElementById("aud-tbody").innerHTML = rows
+    .map((e) => {
+      const scope =
+        e.scope === "campus"
+          ? "campus breakout"
+          : e.scope === "office"
+            ? "system office"
+            : e.board === "CSU"
+              ? "system, audited"
+              : "consolidated, audited";
+      return (
+        '<tr data-aud="' +
+        e.id +
+        '" tabindex="0"' +
+        (e.id === state.audEntity ? ' aria-selected="true"' : "") +
+        '><td class="cell-name">' +
+        escapeHtml(AUD_SHORT[e.id] || e.name) +
+        '<span class="aud__scope">' +
+        scope +
+        "</span></td><td class='num mono'>" +
+        (e.fte ? int(e.fte[1]) : "—") +
+        "</td>" +
+        cols
+          .map(
+            ([k]) =>
+              "<td class='num mono'>" +
+              audMoney(audVal(e, k, 1)) +
+              "</td><td class='num mono'>" +
+              audDelta(audVal(e, k, 0), audVal(e, k, 1)) +
+              "</td>",
+          )
+          .join("") +
+        "<td class='num mono'>" +
+        money(audVal(e, "pell", 1, "total")) +
+        "</td></tr>"
+      );
+    })
+    .join("");
+  document.querySelectorAll("#aud-tbody tr").forEach((tr) => {
+    const pick = () => setAudEntity(tr.dataset.aud);
+    tr.addEventListener("click", pick);
+    tr.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        pick();
+      }
+    });
+  });
+}
+
+function renderAudFoot() {
+  const m = state.aud.meta;
+  const s = m.sources;
+  const recon = (m.reconciliation || []).map(
+    (n) => "<li>" + escapeHtml(n) + "</li>",
+  );
+  document.getElementById("aud-foot").innerHTML =
+    "Sources: " +
+    link(
+      s.csu.url,
+      "CSU System audited financial statements, FY2025 (with restated FY2024)",
+    ) +
+    "; " +
+    link(s.cuafr.url, "CU Annual Financial Report, FY2025 (audited)") +
+    "; CU campus supplements for " +
+    link(s.cu2025.url, "FY2025") +
+    " and " +
+    link(s.cu2024.url, "FY2024") +
+    ". FTE is IPEDS 12-month FTE (EFIA2024, EFIA2025). " +
+    "CU campus rows come from CU's unaudited campus supplement, which breaks out the audited totals and reconciles to them; campus operating lines include Denver's internal service centers, which drop out of the consolidated total. " +
+    "CSU reports only at system level (Fort Collins, Pueblo, CSU Global, system office), without its foundations. " +
+    "These GASB statement lines are not IPEDS F1A lines, so compare years within this card, not against the IPEDS card above. Per-FTE and change figures use " +
+    dollarsLabel() +
+    "." +
+    (recon.length ? "<ul>" + recon.join("") + "</ul>" : "");
+}
+
+/* ── How-to-read guide ─────────────────────────────────────────────────── */
+const GUIDE_BARS = [
+  { label: "Gross tuition & fees", kind: "inc" },
+  { label: "Scholarship allowance", kind: "dec" },
+  { label: "Net tuition & fees", kind: "total" },
+  { label: "Fee-for-service", kind: "inc" },
+  { label: "Grants & contracts", kind: "inc" },
+  { label: "Auxiliary & other", kind: "inc" },
+  { label: "Operating revenue", kind: "total" },
+  { label: "Operating expenses", kind: "dec" },
+  { label: "Operating result", kind: "total" },
+  { label: "Nonoperating, net", kind: "inc" },
+  { label: "Capital & other", kind: "inc" },
+  { label: "Bottom line", kind: "total" },
+];
+const GUIDE_STEPS = [
+  { pill: "Sticker price", bars: [0, 1, 2] },
+  { pill: "Operating revenue", bars: [2, 3, 4, 5, 6] },
+  { pill: "Spending", bars: [6, 7] },
+  { pill: "Operating loss", bars: [7, 8] },
+  { pill: "Nonoperating", bars: [8, 9, 10, 11] },
+  { pill: "Compare fairly", bars: [] },
+];
+
+function guideEntity() {
+  const e = audEntity();
+  return e && e.fte ? e : audEntity("cub");
+}
+
+// Waterfall geometry: [start, end] per bar, in the page's dollars.
+function guideBars(e) {
+  const t = (k) => audVal(e, k, 1, "total");
+  const gross = t("tuitionFeesGross");
+  const net = t("tuitionFeesNet");
+  const ffs = t("feeForService");
+  const grants = t("grants");
+  const rev = t("operatingRevenue");
+  const other = rev - net - ffs - grants;
+  const exp = t("operatingExpense");
+  const op = rev - exp;
+  const nonop = t("nonoperating");
+  const cap = t("otherRevenues");
+  const bottom = op + nonop + cap;
+  const spans = [
+    [0, gross],
+    [net, gross],
+    [0, net],
+    [net, net + ffs],
+    [net + ffs, net + ffs + grants],
+    [net + ffs + grants, rev],
+    [0, rev],
+    [op, rev],
+    [Math.min(0, op), Math.max(0, op)],
+    [op, op + nonop],
+    [op + nonop, bottom],
+    [Math.min(0, bottom), Math.max(0, bottom)],
+  ];
+  const amounts = [
+    gross,
+    -(gross - net),
+    net,
+    ffs,
+    grants,
+    other,
+    rev,
+    -exp,
+    op,
+    nonop,
+    cap,
+    bottom,
+  ];
+  return {
+    spans,
+    amounts,
+    t,
+    gross,
+    net,
+    ffs,
+    grants,
+    other,
+    rev,
+    exp,
+    op,
+    nonop,
+    cap,
+    bottom,
+  };
+}
+
+function setGuideStep(i) {
+  state.guideStep = Math.max(0, Math.min(GUIDE_STEPS.length - 1, i));
+  renderGuide();
+}
+
+const guideLabels = {
+  id: "guideLabels",
+  afterDatasetsDraw(chart, _a, opts) {
+    const { ctx } = chart;
+    const meta = chart.getDatasetMeta(0);
+    ctx.save();
+    ctx.font = "600 10.5px 'JetBrains Mono', monospace";
+    ctx.textBaseline = "middle";
+    meta.data.forEach((bar, i) => {
+      const a = opts.amounts[i];
+      if (a == null) return;
+      const on = opts.on(i);
+      ctx.fillStyle = on ? opts.text : opts.faint;
+      const right = Math.max(bar.x, bar.base);
+      const txt = (a < 0 ? "−" : "") + money(Math.abs(a));
+      const w = ctx.measureText(txt).width;
+      const room = chart.chartArea.right - right;
+      if (room > w + 8) {
+        ctx.textAlign = "left";
+        ctx.fillText(txt, right + 5, bar.y);
+      } else {
+        ctx.textAlign = "right";
+        ctx.fillText(txt, Math.min(bar.x, bar.base) - 5, bar.y);
+      }
+    });
+    ctx.restore();
+  },
+};
+
+function renderGuide() {
+  if (!state.aud) return;
+  const e = guideEntity();
+  const gsel = document.getElementById("guide-entity");
+  gsel.value = e.id;
+  const g = guideBars(e);
+  const step = GUIDE_STEPS[state.guideStep];
+  const on = (i) => !step.bars.length || step.bars.includes(i);
+  const system = e.scope === "system";
+  GUIDE_BARS[11].label = system ? "Change in net position" : "Before transfers";
+
+  destroy("guide");
+  const base = chartBase();
+  const color = (kind) =>
+    css(kind === "inc" ? "--co-1" : kind === "dec" ? "--co-4" : "--co-6");
+  const hex = (c, i) => (on(i) ? c : c + "24");
+  document.getElementById("guide-legend").innerHTML = legendHtml([
+    { label: "Adds", color: css("--co-1") },
+    { label: "Subtracts", color: css("--co-4") },
+    { label: "Subtotal", color: css("--co-6") },
+  ]);
+  charts.guide = new Chart(document.getElementById("guide-chart"), {
+    type: "bar",
+    data: {
+      labels: GUIDE_BARS.map((b) => b.label),
+      datasets: [
+        {
+          data: g.spans,
+          backgroundColor: GUIDE_BARS.map((b, i) =>
+            hex(
+              b.kind === "inc" && g.amounts[i] < 0
+                ? color("dec")
+                : color(b.kind),
+              i,
+            ),
+          ),
+          borderSkipped: false,
+          borderRadius: 2,
+          barPercentage: 0.78,
+          categoryPercentage: 0.92,
+        },
+      ],
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 220 },
+      layout: { padding: { right: 4 } },
+      onClick: (_ev, els) => {
+        if (!els.length) return;
+        const bar = els[0].index;
+        const s = GUIDE_STEPS.findIndex((x) => x.bars.includes(bar));
+        if (s >= 0) setTimeout(() => setGuideStep(s), 0);
+      },
+      onHover: (ev, els) =>
+        (ev.native.target.style.cursor = els.length ? "pointer" : "default"),
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...base.tooltip,
+          callbacks: {
+            label: (c) => {
+              const a = g.amounts[c.dataIndex];
+              return " " + (a < 0 ? "−" : "") + money(Math.abs(a));
+            },
+          },
+        },
+        guideLabels: {
+          amounts: g.amounts,
+          on,
+          text: css("--color-text"),
+          faint: css("--color-text-faint") || css("--color-text-muted"),
+        },
+      },
+      scales: {
+        x: axis(
+          base,
+          null,
+          (v) => axisMoney(Math.abs(v)).replace("$", v < 0 ? "−$" : "$"),
+          {
+            grace: "12%",
+          },
+        ),
+        y: axis(base, null, undefined, {
+          grid: { display: false },
+          ticks: {
+            autoSkip: false,
+            color: (ctx) => (on(ctx.index) ? css("--color-text") : base.text),
+            font: (ctx) => ({
+              family: "'Satoshi', sans-serif",
+              size: 11,
+              weight: on(ctx.index) && step.bars.length ? "700" : "400",
+            }),
+          },
+        }),
+      },
+    },
+    plugins: [guideLabels],
+  });
+
+  document.querySelectorAll(".guide__step").forEach((b) => {
+    const cur = Number(b.dataset.step) === state.guideStep;
+    if (cur) b.setAttribute("aria-current", "step");
+    else b.removeAttribute("aria-current");
+  });
+  document.getElementById("guide-prev").disabled = state.guideStep === 0;
+  document.getElementById("guide-next").disabled =
+    state.guideStep === GUIDE_STEPS.length - 1;
+  document.getElementById("guide-count").textContent =
+    state.guideStep + 1 + " / " + GUIDE_STEPS.length;
+  document.getElementById("guide-body").innerHTML = guideText(e, g);
+  const yr = shortFy(audYears()[1]);
+  document.getElementById("guide-sub").textContent =
+    (AUD_SHORT[e.id] || e.name) + " · " + yr + " · " + dollarsLabel();
+  document.getElementById("guide-foot").textContent =
+    "Built from the same " +
+    yr +
+    " statement lines as the audited card. Bars float from where the previous line left off; totals start at zero. " +
+    (system
+      ? "The bottom line is the statement's change in net position."
+      : "Campus figures stop before CU-internal transfers, so the last bar is not the campus's change in net position.");
+}
+
+function guideText(e, g) {
+  const m = (v) =>
+    "<strong>" + (v < 0 ? "−" : "") + money(Math.abs(v)) + "</strong>";
+  const name = escapeHtml(AUD_SHORT[e.id] || e.name);
+  const t = g.t;
+  const i = state.guideStep;
+  const perFte = (v) => (e.fte ? money(v / e.fte[1]) : "—");
+  if (i === 0) {
+    const disc = g.gross ? Math.round(((g.gross - g.net) / g.gross) * 100) : 0;
+    return (
+      "<h3>1 · Start with the sticker price</h3>" +
+      "<p>" +
+      name +
+      " billed " +
+      m(g.gross) +
+      " in tuition and fees at published rates. Institutional aid is not shown as spending; it comes off the top as a <strong>scholarship allowance</strong> of " +
+      m(g.gross - g.net) +
+      ".</p><p>That is a " +
+      disc +
+      "% discount, leaving " +
+      m(g.net) +
+      " of net tuition and fees. The net figure is what students, families, and third parties actually paid.</p>"
+    );
+  }
+  if (i === 1) {
+    const share = g.rev ? Math.round((g.net / g.rev) * 100) : 0;
+    return (
+      "<h3>2 · Build operating revenue</h3>" +
+      "<p>Add Colorado's <strong>fee-for-service</strong> contracts (" +
+      m(g.ffs) +
+      "), <strong>grants and contracts</strong> (" +
+      m(g.grants) +
+      ", mostly sponsored research), and auxiliaries, sales, and other lines (" +
+      m(g.other) +
+      ") to reach " +
+      m(g.rev) +
+      " of operating revenue.</p>" +
+      "<p>Net tuition is " +
+      share +
+      "% of it. The College Opportunity Fund stipend the state pays per resident student is already inside tuition, so state support is split between that line and fee-for-service.</p>"
+    );
+  }
+  if (i === 2) {
+    const parts = AUD_EXP.map(([k, l]) => [l, t(k)])
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1]);
+    const chips = parts
+      .slice(0, 6)
+      .map(
+        ([l, v]) =>
+          '<span class="tag">' +
+          escapeHtml(l) +
+          " " +
+          Math.round((v / g.exp) * 100) +
+          "%</span>",
+      )
+      .join("");
+    return (
+      "<h3>3 · See where the money goes</h3>" +
+      "<p>Operating expenses were " +
+      m(g.exp) +
+      ", reported by <strong>function</strong> (what the spending is for) rather than by object (salaries, supplies).</p>" +
+      '<div class="guide__chips">' +
+      chips +
+      "</div>" +
+      "<p>Instruction was " +
+      perFte(t("instruction")) +
+      " per FTE student. Depreciation is a non-cash charge for using buildings and equipment.</p>"
+    );
+  }
+  if (i === 3) {
+    return (
+      "<h3>4 · An operating loss is normal</h3>" +
+      "<p>Operating revenue minus operating expenses gives an operating result of " +
+      m(g.op) +
+      (g.rev ? " (" + pct(g.op / g.rev) + " of revenue)" : "") +
+      ".</p>" +
+      "<p>That is not a warning sign by itself. Under GASB rules for public universities, <strong>Pell grants, gifts, investment income, and state appropriations are nonoperating</strong>, so they fall below this line even though they pay for day-to-day operations.</p>"
+    );
+  }
+  if (i === 4) {
+    return (
+      "<h3>5 · Nonoperating revenue closes the gap</h3>" +
+      "<p>Net nonoperating revenue was " +
+      m(g.nonop) +
+      ": Pell " +
+      m(t("pell")) +
+      ", gifts " +
+      m(t("gifts")) +
+      ", investment income " +
+      m(t("investment")) +
+      (t("stateAppropriations")
+        ? ", state appropriations " + m(t("stateAppropriations"))
+        : "") +
+      ", less interest on capital debt " +
+      m(t("interest")) +
+      ".</p>" +
+      "<p>Capital appropriations, capital grants and gifts, and similar items add " +
+      m(g.cap) +
+      ", for a bottom line of " +
+      m(g.bottom) +
+      (e.scope === "system"
+        ? ", the change in net position."
+        : ". CU's campus statements continue with internal transfers between campuses and the system office, so this is not the campus's change in net position.") +
+      "</p>"
+    );
+  }
+  const fte = e.fte ? int(e.fte[1]) : "—";
+  return (
+    "<h3>6 · Compare fairly</h3>" +
+    "<ul>" +
+    "<li><strong>Divide by students.</strong> " +
+    name +
+    " enrolled " +
+    fte +
+    " FTE, so operating expenses were " +
+    perFte(g.exp) +
+    " per FTE.</li>" +
+    "<li><strong>Match the scope.</strong> CU Denver | Anschutz includes a medical campus and health services; the CSU figures cover the whole system.</li>" +
+    "<li><strong>Don't mix sources.</strong> These GASB statement lines are not IPEDS F1A lines. Compare years within one source.</li>" +
+    "<li><strong>Watch pensions.</strong> PERA pension and OPEB accounting move expenses by tens of millions without cash changing hands.</li>" +
+    "<li><strong>Restricted money is not flexible.</strong> Research grants and most gifts can only be spent as the donor or sponsor directs.</li>" +
+    "</ul>"
+  );
 }
 
 boot().catch((err) => {

@@ -81,7 +81,14 @@
             ><span class="hide-sm">Campus finances</span
             ><span class="show-sm">Finances</span></a
           >
-          <a class="btn btn--ghost" href="index.html" id="back-link"
+          <a class="btn btn--ghost" href="#guide" id="guide-jump" hidden
+            ><span class="hide-sm">How to read</span
+            ><span class="show-sm">Guide</span></a
+          >
+          <a
+            class="btn btn--ghost btn--national"
+            href="index.html"
+            id="back-link"
             >National<span class="hide-sm"> explorer</span></a
           >
           <button
@@ -218,6 +225,97 @@
             </table>
           </div>
           <p class="card__foot" id="fin-foot"></p>
+        </section>
+
+        <section class="card" id="aud" hidden>
+          <div class="card__head card__head--wrap">
+            <div>
+              <h2 class="card__title">
+                Latest audited statements · <span id="aud-year">FY2024-25</span>
+                <span class="tag aud__badge">Audited statements</span>
+              </h2>
+              <p class="card__sub" id="aud-sub">
+                CU and CSU annual financial reports, a year ahead of IPEDS
+              </p>
+            </div>
+            <div class="co-controls co-controls--inline">
+              <label class="sel">
+                <span>Entity</span>
+                <select id="aud-entity" class="input input--sm"></select>
+              </label>
+              <div class="seg" role="radiogroup" aria-label="Scale">
+                <button class="seg__btn" data-aud-view="per" role="radio">
+                  Per FTE
+                </button>
+                <button class="seg__btn" data-aud-view="total" role="radio">
+                  Totals
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="grid2 grid2--flush">
+            <div>
+              <h3 class="fin__h" id="aud-rev-h">Operating revenue</h3>
+              <div class="legend" id="aud-legend"></div>
+              <div class="chartbox aud__box" id="aud-rev-box">
+                <canvas id="aud-rev"></canvas>
+              </div>
+            </div>
+            <div>
+              <h3 class="fin__h" id="aud-exp-h">
+                Operating expenses by function
+              </h3>
+              <div class="legend" aria-hidden="true"></div>
+              <div class="chartbox aud__box" id="aud-exp-box">
+                <canvas id="aud-exp"></canvas>
+              </div>
+            </div>
+          </div>
+          <dl class="fin__stats aud__stats" id="aud-stats"></dl>
+          <div class="tablewrap">
+            <table class="table" id="aud-table">
+              <thead></thead>
+              <tbody id="aud-tbody"></tbody>
+            </table>
+          </div>
+          <p class="card__foot" id="aud-foot"></p>
+        </section>
+
+        <section class="card" id="guide" hidden>
+          <div class="card__head card__head--wrap">
+            <div>
+              <h2 class="card__title">
+                How to read a university income statement
+              </h2>
+              <p class="card__sub" id="guide-sub">
+                Six steps from sticker price to bottom line
+              </p>
+            </div>
+            <div class="co-controls co-controls--inline">
+              <label class="sel">
+                <span>Entity</span>
+                <select id="guide-entity" class="input input--sm"></select>
+              </label>
+            </div>
+          </div>
+          <div class="guide">
+            <div class="guide__chart">
+              <div class="legend" id="guide-legend"></div>
+              <div class="chartbox guide__box">
+                <canvas id="guide-chart"></canvas>
+              </div>
+            </div>
+            <div class="guide__panel">
+              <ol class="guide__steps" id="guide-steps" aria-label="Steps"></ol>
+              <div class="guide__body" id="guide-body" aria-live="polite"></div>
+              <div class="guide__nav">
+                <button class="btn btn--ghost" id="guide-prev">Back</button>
+                <span class="guide__count mono" id="guide-count"></span>
+                <button class="btn" id="guide-next">Next</button>
+              </div>
+            </div>
+          </div>
+          <p class="card__foot" id="guide-foot"></p>
         </section>
 
         <section class="card">

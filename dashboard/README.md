@@ -20,6 +20,7 @@ descriptive-trend baseline in `src/models/forecast_enrollment.py`.
 | `colorado.html`, `colorado.js` | Colorado panel: formula funding and resident FTE by governing board |
 | `data/colorado.json`           | 13 governing boards, 29 institutions, FY2007-08 to FY2025-26        |
 | `data/colorado_finance.json`   | IPEDS finance + FTE for 27 Colorado units, FY2014-15 to FY2023-24   |
+| `data/colorado_audited.json`   | Audited CU and CSU statement lines, FY2023-24 and FY2024-25         |
 
 ## Rebuilding the data
 
@@ -144,8 +145,7 @@ python -m src.ingest.colorado_finance  # writes data/colorado_finance.json
   (F1C012, F1C052, F1C062); "Total incl. benefits" shows the full function
   totals.
 - Real dollars use the semiannual Denver-Aurora-Lakewood CPI-U (BLS
-  CUUSS48BSA0), because the monthly series has no values from 1987 to late
-  2017. Values are then carried to FY2025-26 dollars with the page's factor.
+  CUUSS48BSA0), because the monthly series has no values from 1987 to late 2017. Values are then carried to FY2025-26 dollars with the page's factor.
 - IPEDS unit 126562 combines CU Denver and the Anschutz Medical Campus, and
   126818 includes CSU's veterinary school and state agencies, so their
   per-FTE figures are high. FY2023-24 is provisional until NCES issues the
@@ -205,6 +205,49 @@ both builds equally, so the comparison above did not catch it. It is fixed and
 covered by `tests/test_carnegie_codes.py`. Before the fix, the dashboard's
 Tribal filter listed "Other Special Focus" institutions, and the 35 tribal
 colleges showed as unclassified.
+
+#### Latest audited statements (CU and CSU)
+
+IPEDS Finance lags about two years, so the "Latest audited statements" card
+adds FY2024-25 from the institutions' own annual reports, kept separate from
+the IPEDS card because GASB statement lines are not IPEDS F1A lines.
+
+- CU: the [FY2025 campus supplement](https://www.cu.edu/doc/supplementalsfy2025pdf?download=true)
+  and [FY2024 supplement](https://www.cu.edu/doc/supplementals-fy2024pdf-1)
+  (unaudited campus breakouts that reconcile to audited totals), plus the
+  [FY2025 Annual Financial Report](https://www.cu.edu/doc/2025-university-colorado-afrpdf?download=true)
+  for consolidated totals.
+- CSU: the [CSU System FY2025 financial statements](https://busfin.colostate.edu/Forms/Fin_Statements/finstmt2025.pdf)
+  (with restated FY2024), reported only at system level.
+
+Save the PDFs in `data/raw/audited/` (`cu_supp_fy2025.pdf`, `cu_supp_fy2024.pdf`,
+`cu_afr_fy2025.pdf`, `csu_fs_fy2025.pdf`), then:
+
+```bash
+pip install -e ".[colorado]"          # pdfplumber
+python -m src.ingest.colorado_audited  # writes data/colorado_audited.json
+```
+
+- The parser reads the statement of revenues, expenses and changes in net
+  position by word position, and `check()` requires revenue and expense lines
+  to sum to the printed totals. "Other operating" is the residual.
+- Reconciliation fixes are listed in the JSON `meta.reconciliation` and on the
+  card: UCCS FY2023-24 nonoperating total printed with the wrong sign, and
+  UCB/UCCS FY2023-24 printed "other operating" lines that do not tie to total
+  operating revenue.
+- Campus operating lines include CU Denver internal service centers
+  ($19.2M FY2023-24, $15.7M FY2024-25), which are eliminated in the
+  consolidated statement.
+- Per-FTE uses IPEDS 12-month FTE (EFIA2024, EFIA2025); the CU system office
+  has no FTE, so only totals are shown for it.
+
+#### How to read guide
+
+The "How to read a university income statement" card walks through six steps
+(sticker price → operating revenue → spending → operating loss →
+nonoperating → compare fairly) on a waterfall built from the same audited
+lines. Its text is computed from the JSON, so it updates when the data does.
+Deep links: `#section=guide`, `#section=audited&aud=csu&audview=total`.
 
 ## Running locally
 

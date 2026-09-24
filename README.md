@@ -90,6 +90,7 @@ from state PDFs:
 pip install -e ".[colorado]"
 python -m src.ingest.colorado
 python -m src.ingest.colorado_finance   # IPEDS campus finances
+python -m src.ingest.colorado_audited   # audited CU and CSU statements, FY2024-25
 ```
 
 ## A note on real IPEDS variable codes

@@ -31,8 +31,8 @@ def decode_arcs(topology: dict) -> list[list[tuple[float, float]]]:
     """Undo TopoJSON quantization and delta encoding into absolute points."""
     transform = topology.get("transform")
     if transform:
-        (sx, sy) = transform["scale"]
-        (tx, ty) = transform["translate"]
+        sx, sy = transform["scale"]
+        tx, ty = transform["translate"]
     else:
         sx = sy = 1.0
         tx = ty = 0.0
@@ -77,9 +77,7 @@ def geometry_to_path(arcs, geometry: dict) -> str:
         polygons = geometry["arcs"]
     else:
         return ""
-    return "".join(
-        ring_to_path(arcs, ring) for polygon in polygons for ring in polygon
-    )
+    return "".join(ring_to_path(arcs, ring) for polygon in polygons for ring in polygon)
 
 
 def main() -> None:
@@ -110,9 +108,7 @@ def main() -> None:
         "states": states,
     }
     OUT.write_text(json.dumps(payload, separators=(",", ":")))
-    print(
-        f"Wrote {OUT} ({len(states)} states, {OUT.stat().st_size / 1e6:.2f} MB)"
-    )
+    print(f"Wrote {OUT} ({len(states)} states, {OUT.stat().st_size / 1e6:.2f} MB)")
 
 
 if __name__ == "__main__":

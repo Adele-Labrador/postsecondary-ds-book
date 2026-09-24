@@ -326,13 +326,20 @@
         <footer class="foot">
           <h2 class="foot__title">Sources &amp; method</h2>
           <p>
-            All figures are real IPEDS data, retrieved from the
+            All figures are real IPEDS data, built directly from the
+            <a
+              href="https://nces.ed.gov/ipeds/use-the-data"
+              target="_blank"
+              rel="noopener"
+              >NCES IPEDS Complete Data Files</a
+            >, using revised releases where NCES has published them. The build
+            was reconciled field by field against the
             <a
               href="https://educationdata.urban.org/documentation/colleges.html"
               target="_blank"
               rel="noopener"
               >Urban Institute Education Data Portal</a
-            >, which republishes
+            >, which republishes the same
             <a href="https://nces.ed.gov/ipeds/" target="_blank" rel="noopener"
               >NCES IPEDS</a
             >
@@ -358,11 +365,12 @@
           </p>
           <ul class="foot__list">
             <li>
-              <strong>Vintage.</strong> Enrollment, completion, selectivity,
-              retention and tuition are
-              <span class="mono" id="foot-year">—</span>. Financial-aid figures
-              lag one year in the portal and are
-              <span class="mono" id="foot-aidyear">—</span>.
+              <strong>Vintage.</strong> Enrollment, selectivity, retention and
+              tuition are <span class="mono" id="foot-year">—</span>. Graduation
+              rates are <span class="mono" id="foot-gradyear">—</span> and
+              financial-aid figures are
+              <span class="mono" id="foot-aidyear">—</span>: NCES finalizes
+              those components a year later, and only final releases are used.
             </li>
             <li>
               <strong>Missing data.</strong> IPEDS suppresses or omits metrics
@@ -370,6 +378,12 @@
               report no admit rate, and graduation rates require a qualifying
               cohort. Blank cells mean not reported, never zero. Medians are
               computed over reporting institutions only.
+            </li>
+            <li>
+              <strong>Graduation rate.</strong> Completion within 150% of normal
+              time: six years for four-year institutions, three years for
+              two-year institutions. The two are not directly comparable, so
+              filter by Carnegie family before comparing across levels.
             </li>
             <li>
               <strong>Peer groups.</strong> Peers are the nearest institutions

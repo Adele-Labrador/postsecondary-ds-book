@@ -55,7 +55,10 @@ CC_BASIC_2021 = {
     2: ("Associate's Colleges: High Transfer-Mixed Traditional/Nontraditional", A),
     3: ("Associate's Colleges: High Transfer-High Nontraditional", A),
     4: ("Associate's Colleges: Mixed Transfer/Career & Technical-High Traditional", A),
-    5: ("Associate's Colleges: Mixed Transfer/Career & Technical-Mixed Traditional/Nontraditional", A),
+    5: (
+        "Associate's Colleges: Mixed Transfer/Career & Technical-Mixed Traditional/Nontraditional",
+        A,
+    ),
     6: ("Associate's Colleges: Mixed Transfer/Career & Technical-High Nontraditional", A),
     7: ("Associate's Colleges: High Career & Technical-High Traditional", A),
     8: ("Associate's Colleges: High Career & Technical-Mixed Traditional/Nontraditional", A),
@@ -160,9 +163,10 @@ def main() -> None:
     directory = fetch(f"/directory/{PRIMARY_YEAR}/")
 
     print("  student-faculty ratio ...")
-    sfr = {r["unitid"]: num(r.get("student_faculty_ratio")) for r in fetch(
-        f"/student-faculty-ratio/{PRIMARY_YEAR}/"
-    )}
+    sfr = {
+        r["unitid"]: num(r.get("student_faculty_ratio"))
+        for r in fetch(f"/student-faculty-ratio/{PRIMARY_YEAR}/")
+    }
 
     print("  admissions ...")
     adm = {}

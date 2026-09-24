@@ -278,6 +278,16 @@ const REQUIREABLE = [
   ["tuitionIn", "Tuition"],
 ];
 
+// "2023" when every metric shares a year, else e.g. "2023 · grad rate & aid 2022".
+function vintageLabel(meta) {
+  const grad = meta.gradYear ?? meta.primaryYear;
+  const aid = meta.aidYear ?? meta.primaryYear;
+  if (grad === meta.primaryYear && aid === meta.primaryYear)
+    return String(meta.primaryYear);
+  if (grad === aid) return meta.primaryYear + " · grad rate & aid " + grad;
+  return meta.primaryYear + " · grad rate " + grad + " · aid " + aid;
+}
+
 function buildControls() {
   const { meta, all } = state;
 
@@ -287,6 +297,8 @@ function buildControls() {
   document.getElementById("hdr-year").textContent = meta.primaryYear;
   document.getElementById("foot-year").textContent = meta.primaryYear;
   document.getElementById("foot-aidyear").textContent = meta.aidYear;
+  document.getElementById("foot-gradyear").textContent =
+    meta.gradYear ?? meta.primaryYear;
 
   // Control chips with counts
   const controlBox = document.getElementById("f-control");
@@ -890,11 +902,11 @@ function renderTrend() {
 
   const fitted = labels.map((_, i) => intercept + slope * i);
   const actual = [...totals, ...futureYears.map(() => null)];
-  // Join the dashed segment to the last actual point so the line is continuous.
+  // Continue the fitted line, not the last observation: splicing onto the
+  // last actual value draws a one-year jump the model does not predict.
   const forecast = labels.map((_, i) =>
     i < years.length - 1 ? null : intercept + slope * i,
   );
-  forecast[years.length - 1] = totals[totals.length - 1];
 
   const primary = css("--color-primary");
   const accent = css("--color-accent");
@@ -903,17 +915,26 @@ function renderTrend() {
     ? (totals[totals.length - 1] - totals[0]) / totals[0]
     : 0;
   const projected = intercept + slope * (labels.length - 1);
+  const n = totals.length;
+  const latestChange =
+    n > 1 && totals[n - 2]
+      ? (totals[n - 1] - totals[n - 2]) / totals[n - 2]
+      : 0;
   foot.textContent =
     "Observed change " +
     fmt.signedPct(pctChange) +
     " over " +
     (years.length - 1) +
-    " years. OLS trend implies " +
+    " years (" +
+    fmt.signedPct(latestChange) +
+    " in " +
+    years[n - 1] +
+    "). OLS trend implies " +
     fmt.compact(projected) +
     " FTE by " +
     futureYears[futureYears.length - 1] +
     " (" +
-    fmt.signedPct(slope / (totals[totals.length - 1] || 1)) +
+    fmt.signedPct(slope / (intercept + slope * (n - 1) || 1)) +
     " per year). Descriptive trend only.";
 
   charts.trend = new Chart(document.getElementById("trend"), {
@@ -930,7 +951,7 @@ function renderTrend() {
           pointRadius: 2.5,
           pointHoverRadius: 5,
           fill: true,
-          tension: 0.25,
+          cubicInterpolationMode: "monotone",
         },
         {
           label: "OLS trend",
@@ -1544,7 +1565,7 @@ function openDrawer(d, keepScroll) {
       ? '<p class="dtl__carnegie">' + escapeHtml(d.carnegie) + "</p>"
       : "") +
     '<section class="dtl__section"><h3 class="dtl__h">Reported metrics · ' +
-    state.meta.primaryYear +
+    vintageLabel(state.meta) +
     '</h3><dl class="dtl__grid">' +
     DRAWER_METRICS.map(
       (k) =>
@@ -1664,7 +1685,7 @@ function renderDetailChart(d, peers) {
           pointRadius: 2,
           pointHoverRadius: 5,
           fill: true,
-          tension: 0.25,
+          cubicInterpolationMode: "monotone",
           spanGaps: true,
         },
         {

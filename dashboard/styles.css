@@ -1782,3 +1782,22 @@ select.input {
 #fin-table th {
   white-space: nowrap;
 }
+
+.show-sm {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .hide-sm {
+    display: none;
+  }
+  .show-sm {
+    display: inline;
+  }
+}
+
+@media (max-width: 400px) {
+  .header__actions .btn--ghost {
+    padding-inline: var(--space-2);
+  }
+}

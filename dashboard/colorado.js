@@ -320,6 +320,14 @@ async function boot() {
   state.fin = fin;
   if (fin) setupFinance();
   else document.getElementById("fin").hidden = true;
+  const jump = document.getElementById("fin-jump");
+  jump.hidden = !fin;
+  // #main scrolls internally and the hash holds panel state, so scroll in JS
+  // instead of following the anchor.
+  jump.addEventListener("click", (e) => {
+    e.preventDefault();
+    jumpToFinance();
+  });
   const ids = state.data.boards.map((b) => b.id);
   const b = hashGet("board");
   state.board = ids.includes(b) ? b : "ALL";
@@ -349,6 +357,8 @@ async function boot() {
   renderFoot();
   renderAll();
   syncLinks();
+  if (fin && hashGet("section") === "finances")
+    requestAnimationFrame(() => jumpToFinance(true));
   const loader = document.getElementById("loading");
   loader.classList.add("loading--out");
   setTimeout(() => (loader.hidden = true), 320);
@@ -1135,6 +1145,19 @@ function setupFinance() {
   const c = Number(hashGet("campus"));
   state.unit = ids.includes(c) ? c : null;
   state.basis = hashGet("basis") === "total" ? "total" : "salaries";
+}
+
+function jumpToFinance(instant) {
+  const main = document.getElementById("main");
+  const target = document.getElementById("fin");
+  const top =
+    target.getBoundingClientRect().top -
+    main.getBoundingClientRect().top +
+    main.scrollTop -
+    12;
+  main.scrollTo({ top, behavior: instant ? "auto" : "smooth" });
+  target.querySelector("#fin-unit").focus({ preventScroll: true });
+  hashSet("section", "finances");
 }
 
 function setUnit(id) {

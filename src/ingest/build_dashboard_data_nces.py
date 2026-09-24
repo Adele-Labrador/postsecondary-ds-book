@@ -16,6 +16,7 @@ sfr                     ``EF{Y}D.STUFACR``                      3,707 / 3,707
 retention               ``EF{Y}D.RET_PCF / 100``                3,305 / 3,305
 admitRate, yieldRate    ``ADM{Y}``  ADMSSN/APPLCN, ENRLT/ADMSSN 1,826 / 1,826
 tuitionIn / tuitionOut  ``IC{Y}_AY``  TUITION2+FEE2 / 3+FEE3     3,395 / 3,395
+tuitionDistrict         ``IC{Y}_AY``  TUITION1+FEE1              (not in portal build)
 pellPct, pellAvg        ``SFA{A}{A+1}``  UPGRNTP / 100, UPGRNTA  3,690 / 3,690
 gradRate, gradCohort    ``GR{Y+1}``  see :func:`grad_rates`      2,224 / 2,224
 ======================  ======================================  =============
@@ -199,6 +200,9 @@ def build(year: int, aid_year: int | None = None, grad_file_year: int | None = N
     sfr = num(efd["STUFACR"])
     retention = num(efd["RET_PCF"]) / 100
     applied, admitted, enrolled = (num(adm[c]) for c in ("APPLCN", "ADMSSN", "ENRLT"))
+    # In-district is what local residents pay; below in-state at ~29% of public
+    # 2-year colleges (e.g. community college districts in TX, CA, IL).
+    tuition_district = num(ic["TUITION1"]) + num(ic["FEE1"])
     tuition_in = num(ic["TUITION2"]) + num(ic["FEE2"])
     tuition_out = num(ic["TUITION3"]) + num(ic["FEE3"])
     pell_pct = num(sfa["UPGRNTP"]) / 100
@@ -245,6 +249,7 @@ def build(year: int, aid_year: int | None = None, grad_file_year: int | None = N
                 "gradRate": g.get("rate"),
                 "gradCohort": g.get("cohort") or None,
                 "retention": clean(at(retention, uid), 4),
+                "tuitionDistrict": clean(at(tuition_district, uid)),
                 "tuitionIn": clean(at(tuition_in, uid)),
                 "tuitionOut": clean(at(tuition_out, uid)),
                 "pellPct": clean(at(pell_pct, uid), 4),

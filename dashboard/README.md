@@ -32,15 +32,16 @@ the Urban Institute Education Data Portal and is kept as an independent check.
 
 ### Current vintage
 
-| Metric group                                  | Year | NCES file             |
-| --------------------------------------------- | ---- | --------------------- |
-| Directory, Carnegie 2021 basic classification | 2023 | `HD2023`              |
-| Student-to-faculty ratio, fall retention      | 2023 | `EF2023D`             |
-| Admissions and yield                          | 2023 | `ADM2023`             |
-| In-state and out-of-state tuition and fees    | 2023 | `IC2023_AY`           |
-| Undergraduate 12-month FTE, 2013–2023 series  | 2023 | `EFIA2014`–`EFIA2024` |
-| Graduation rate within 150% of normal time    | 2022 | `GR2023`              |
-| Pell share and average Pell award             | 2022 | `SFA2223`             |
+| Metric group                                   | Year | NCES file             |
+| ---------------------------------------------- | ---- | --------------------- |
+| Directory, Carnegie 2021 basic classification  | 2023 | `HD2023`              |
+| Student-to-faculty ratio, fall retention       | 2023 | `EF2023D`             |
+| Admissions and yield                           | 2023 | `ADM2023`             |
+| In-state and out-of-state tuition and fees     | 2023 | `IC2023_AY`           |
+| In-district tuition and fees (`TUITION1+FEE1`) | 2023 | `IC2023_AY`           |
+| Undergraduate 12-month FTE, 2013–2023 series   | 2023 | `EFIA2014`–`EFIA2024` |
+| Graduation rate within 150% of normal time     | 2022 | `GR2023`              |
+| Pell share and average Pell award              | 2022 | `SFA2223`             |
 
 Years follow the start-of-academic-year convention used throughout the book,
 so the 12-month enrollment file `EFIA2024` (2023–24) is labeled 2023. `GR2024`

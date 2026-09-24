@@ -100,7 +100,7 @@ const METRICS = {
     axis: fmt.pct,
   },
   retention: {
-    label: "First-year retention",
+    label: "Full-time retention",
     short: "Retention",
     fmt: fmt.pct,
     axis: fmt.pct,
@@ -126,6 +126,12 @@ const METRICS = {
   pellAvg: {
     label: "Average Pell award",
     short: "Pell $",
+    fmt: fmt.usd,
+    axis: fmt.usdK,
+  },
+  tuitionDistrict: {
+    label: "In-district tuition & fees",
+    short: "Tuition (district)",
     fmt: fmt.usd,
     axis: fmt.usdK,
   },
@@ -159,6 +165,24 @@ const LEVELS = [
   { key: "4-year or above", label: "4-year", short: "4-yr" },
   { key: "2-year", label: "2-year", short: "2-yr" },
 ];
+/** Scatter series: by control (default) or by level, which separates the
+ * six-year (4-year) and three-year (2-year) graduation-rate clocks. */
+function colorGroups() {
+  if (state.colorBy === "level")
+    return LEVELS.map((l, i) => ({
+      key: l.key,
+      label: l.label,
+      color: css(i === 0 ? "--color-primary" : "--color-accent"),
+      test: (d) => d.level === l.key,
+    }));
+  return CONTROLS.map(({ key, varName }) => ({
+    key,
+    label: key,
+    color: css(varName),
+    test: (d) => d.control === key,
+  }));
+}
+
 const levelLabel = (key) => (LEVELS.find((l) => l.key === key) || {}).label;
 
 const controlColor = (c) => {
@@ -184,6 +208,7 @@ const state = {
     require: new Set(),
   },
   axes: { x: "pellPct", y: "gradRate" },
+  colorBy: "control",
   distMetric: "gradRate",
   mapMetric: "gradRate",
   sort: { key: "fte", dir: -1 },
@@ -380,6 +405,12 @@ function buildControls() {
   });
   fillSelect("axis-y", axisKeys, state.axes.y, (v) => {
     state.axes.y = v;
+    renderScatter();
+  });
+  const colorSel = document.getElementById("scatter-color");
+  colorSel.value = state.colorBy;
+  colorSel.addEventListener("change", () => {
+    state.colorBy = colorSel.value;
     renderScatter();
   });
   fillSelect("dist-metric", axisKeys, state.distMetric, (v) => {
@@ -847,35 +878,32 @@ function renderScatter() {
 
   const legend = document.getElementById("scatter-legend");
   legend.textContent = "";
-  CONTROLS.forEach(({ key, varName }) => {
-    const n = rows.filter((d) => d.control === key).length;
+  const groups = colorGroups();
+  groups.forEach(({ label, color, test }) => {
+    const n = rows.filter(test).length;
     const item = document.createElement("span");
     item.className = "legend__item";
     item.innerHTML =
       '<span class="legend__swatch" style="--sw:' +
-      css(varName) +
+      color +
       '"></span>' +
-      key +
+      label +
       ' <span class="mono">' +
       n.toLocaleString("en-US") +
       "</span>";
     legend.append(item);
   });
 
-  const datasets = CONTROLS.map(({ key, varName }) => {
-    const color = css(varName);
+  const datasets = groups.map(({ label, color, test }) => {
     return {
-      label: key,
-      data: rows
-        .filter((d) => d.control === key)
-        .map((d) => ({
-          x: d[x],
-          y: d[y],
-          r:
-            rScale *
-            (2 + 6.5 * Math.sqrt(Math.min(d.fte || 0, fteRef) / fteRef)),
-          ref: d,
-        })),
+      label,
+      data: rows.filter(test).map((d) => ({
+        x: d[x],
+        y: d[y],
+        r:
+          rScale * (2 + 6.5 * Math.sqrt(Math.min(d.fte || 0, fteRef) / fteRef)),
+        ref: d,
+      })),
       // Dense overplotting on a dark surface blooms additively, so the dark theme
       // gets a lower fill alpha and no per-dot stroke.
       backgroundColor: color + (isDark() ? "38" : "73"),
@@ -906,7 +934,13 @@ function renderScatter() {
             label(item) {
               const d = item.raw.ref;
               return [
-                d.city + ", " + d.state + " · " + d.control,
+                d.city +
+                  ", " +
+                  d.state +
+                  " · " +
+                  d.control +
+                  " · " +
+                  levelLabel(d.level),
                 my.short + ": " + my.fmt(d[y]),
                 mx.short + ": " + mx.fmt(d[x]),
                 "FTE: " + fmt.int(d.fte),
@@ -1597,6 +1631,7 @@ const DRAWER_METRICS = [
   "admitRate",
   "yieldRate",
   "pellPct",
+  "tuitionDistrict",
   "tuitionIn",
   "tuitionOut",
   "cagr",
@@ -1647,14 +1682,21 @@ function openDrawer(d, keepScroll) {
     '<section class="dtl__section"><h3 class="dtl__h">Reported metrics · ' +
     vintageLabel(state.meta) +
     '</h3><dl class="dtl__grid">' +
-    DRAWER_METRICS.map(
+    DRAWER_METRICS.filter(
+      // In-district only adds information where it differs from in-state.
       (k) =>
-        '<div class="dtl__metric"><dt>' +
-        METRICS[k].label +
-        "</dt><dd>" +
-        or(METRICS[k].fmt(d[k])) +
-        "</dd></div>",
-    ).join("") +
+        k !== "tuitionDistrict" ||
+        (d.tuitionDistrict != null && d.tuitionDistrict !== d.tuitionIn),
+    )
+      .map(
+        (k) =>
+          '<div class="dtl__metric"><dt>' +
+          METRICS[k].label +
+          "</dt><dd>" +
+          or(METRICS[k].fmt(d[k])) +
+          "</dd></div>",
+      )
+      .join("") +
     "</dl></section>" +
     '<section class="dtl__section"><h3 class="dtl__h">Undergraduate FTE, ' +
     years[0] +
@@ -1886,6 +1928,7 @@ function exportCsv() {
     "yieldRate",
     "pellPct",
     "pellAvg",
+    "tuitionDistrict",
     "tuitionIn",
     "tuitionOut",
     "cagr",

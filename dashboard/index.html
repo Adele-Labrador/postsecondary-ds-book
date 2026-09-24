@@ -242,6 +242,13 @@
                 <span>X</span>
                 <select id="axis-x" class="input input--sm"></select>
               </label>
+              <label class="sel">
+                <span>Color</span>
+                <select id="scatter-color" class="input input--sm">
+                  <option value="control">Control</option>
+                  <option value="level">Level</option>
+                </select>
+              </label>
             </div>
           </div>
           <div class="legend" id="scatter-legend"></div>
@@ -388,6 +395,15 @@
               report no admit rate, and graduation rates require a qualifying
               cohort. Blank cells mean not reported, never zero. Medians are
               computed over reporting institutions only.
+            </li>
+            <li>
+              <strong>Retention and price.</strong> Retention is the full-time
+              rate: first-time, full-time students who return the next fall.
+              Part-time students are not included. Tuition and fees are
+              published prices for full-time undergraduates before aid.
+              In-district prices, which apply to local residents at many
+              community colleges, are shown where they are lower than in-state
+              prices.
             </li>
             <li>
               <strong>Graduation rate.</strong> Completion within 150% of normal

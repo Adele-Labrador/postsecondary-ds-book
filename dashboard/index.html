@@ -206,7 +206,8 @@
           <h1 class="header__title">Institutional metrics explorer</h1>
           <p class="header__meta">
             Real IPEDS data ·
-            <span id="hdr-year">—</span> ·
+            <span id="hdr-year">—</span
+            ><span id="hdr-status" class="header__status" hidden></span> ·
             <span id="hdr-count">—</span> institutions
           </p>
         </div>
@@ -386,8 +387,16 @@
               tuition are <span class="mono" id="foot-year">—</span>. Graduation
               rates are <span class="mono" id="foot-gradyear">—</span> and
               financial-aid figures are
-              <span class="mono" id="foot-aidyear">—</span>: NCES finalizes
-              those components a year later, and only final releases are used.
+              <span class="mono" id="foot-aidyear">—</span>, because NCES
+              publishes those components a year later.
+              <span id="foot-provisional"></span>
+            </li>
+            <li>
+              <strong>Small cohorts.</strong> Graduation and retention rates
+              based on fewer than 30 students are shown in grey in the table and
+              profiles, but left out of medians, charts, the map and peer
+              benchmarks. With a cohort of one student, the rate can only be 0%
+              or 100%.
             </li>
             <li>
               <strong>Missing data.</strong> IPEDS suppresses or omits metrics

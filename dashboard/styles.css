@@ -346,6 +346,12 @@ table {
   white-space: nowrap;
 }
 
+@media (max-width: 480px) {
+  .header__meta {
+    white-space: normal;
+  }
+}
+
 .header__chips {
   display: flex;
   flex-wrap: wrap;
@@ -1140,6 +1146,23 @@ select.input {
   color: var(--color-text-muted);
   line-height: 1.35;
   overflow-wrap: break-word;
+}
+
+.dtl__note {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.is-small {
+  color: var(--color-text-muted);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
 }
 
 .dtl__metric dd {

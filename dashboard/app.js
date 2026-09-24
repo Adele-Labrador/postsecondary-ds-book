@@ -252,6 +252,19 @@ function ols(xs, ys) {
 }
 
 /* ── Load ──────────────────────────────────────────────────────────────── */
+// Rates from cohorts this small swing by 10+ points on a single student (a
+// 1-student cohort reads as 0% or 100%). They stay visible in the table and
+// profile but are kept out of medians, charts, the map and peer benchmarks.
+const MIN_COHORT = 30;
+const COHORT_RATES = [
+  ["gradRate", "gradCohort"],
+  ["retention", "retCohort"],
+];
+const smallCohort = (d, key) => d[key] == null && d[key + "Small"] != null;
+const cohortNote = (d, key) => {
+  const pair = COHORT_RATES.find(([k]) => k === key);
+  return pair ? "Cohort of " + d[pair[1]] + " — too small to compare" : "";
+};
 async function boot() {
   const [panel, map] = await Promise.all([
     fetch("data/institutions.json").then((r) => r.json()),
@@ -283,6 +296,12 @@ async function boot() {
         ? (last / first) ** (1 / span) - 1
         : null;
     d.complete = s.every((v) => v != null);
+    for (const [key, cohortKey] of COHORT_RATES) {
+      if (d[key] != null && d[cohortKey] != null && d[cohortKey] < MIN_COHORT) {
+        d[key + "Small"] = d[key];
+        d[key] = null;
+      }
+    }
     d.searchKey = (
       (d.name || "") +
       " " +
@@ -320,6 +339,43 @@ function vintageLabel(meta) {
   return meta.primaryYear + " · grad rate " + grad + " · aid " + aid;
 }
 
+// NCES file prefixes -> plain component names for the provisional note.
+const COMPONENT_NAMES = [
+  ["ADM", "admissions"],
+  ["COST", "tuition"],
+  ["EFIA", "12-month enrollment (FTE)"],
+  ["EF", "fall enrollment (retention, S:F ratio)"],
+  ["GR", "graduation rates"],
+  ["SFA", "financial aid"],
+];
+
+function renderProvisional(meta) {
+  const files = meta.provisional || [];
+  const status = document.getElementById("hdr-status");
+  const note = document.getElementById("foot-provisional");
+  if (!files.length) {
+    status.hidden = true;
+    note.textContent =
+      "All components are NCES final releases, which include institutions' revisions.";
+    return;
+  }
+  const names = [
+    ...new Set(
+      files.map(
+        (f) => (COMPONENT_NAMES.find(([p]) => f.startsWith(p)) || [f, f])[1],
+      ),
+    ),
+  ];
+  status.hidden = false;
+  status.textContent = " (provisional)";
+  note.textContent =
+    "Provisional NCES release for " +
+    names.join(", ") +
+    ". Institutions can still revise these figures, and the final release " +
+    "replaces them about a year later. Revisions to the 2023 files changed " +
+    "fewer than 1.5% of values.";
+}
+
 function buildControls() {
   const { meta, all } = state;
 
@@ -331,6 +387,7 @@ function buildControls() {
   document.getElementById("foot-aidyear").textContent = meta.aidYear;
   document.getElementById("foot-gradyear").textContent =
     meta.gradYear ?? meta.primaryYear;
+  renderProvisional(meta);
 
   // Control chips with counts
   const controlBox = document.getElementById("f-control");
@@ -1494,7 +1551,13 @@ function renderTable() {
       } else if (col.type === "spark") {
         td.innerHTML = sparkline(d.series);
       } else {
-        td.innerHTML = or(METRICS[col.key].fmt(d[col.key]));
+        if (smallCohort(d, col.key)) {
+          td.innerHTML =
+            '<span class="is-small">' +
+            METRICS[col.key].fmt(d[col.key + "Small"]) +
+            "</span>";
+          td.title = cohortNote(d, col.key);
+        } else td.innerHTML = or(METRICS[col.key].fmt(d[col.key]));
       }
       row.append(td);
     });
@@ -1693,7 +1756,12 @@ function openDrawer(d, keepScroll) {
           '<div class="dtl__metric"><dt>' +
           METRICS[k].label +
           "</dt><dd>" +
-          or(METRICS[k].fmt(d[k])) +
+          (smallCohort(d, k)
+            ? METRICS[k].fmt(d[k + "Small"]) +
+              '<span class="dtl__note">' +
+              cohortNote(d, k) +
+              "</span>"
+            : or(METRICS[k].fmt(d[k]))) +
           "</dd></div>",
       )
       .join("") +
@@ -1923,7 +1991,9 @@ function exportCsv() {
     "fte",
     "sfr",
     "gradRate",
+    "gradCohort",
     "retention",
+    "retCohort",
     "admitRate",
     "yieldRate",
     "pellPct",
@@ -1942,9 +2012,10 @@ function exportCsv() {
   };
   const body = state.view
     .map((d) =>
-      [...keys.map((k) => cell(d[k])), ...d.series.map((v) => cell(v))].join(
-        ",",
-      ),
+      [
+        ...keys.map((k) => cell(d[k] ?? d[k + "Small"])),
+        ...d.series.map((v) => cell(v)),
+      ].join(","),
     )
     .join("\n");
 

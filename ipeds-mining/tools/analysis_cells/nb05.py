@@ -202,7 +202,7 @@ CELLS = [
     reported = lib["LEXPTOTF"] > 0
     floor = np.log10(lib.loc[reported, "LEXPTOTF"]).min()
     lib["log_lib_per_fte"] = np.where(reported, np.log10(lib["LEXPTOTF"].where(reported, 1.0)), floor)
-    keep = (lib["LEXP100K"].isin([1, 2]) & (reported | (lib["small_library"] == 1))).to_numpy()
+    keep = (lib["LEXP100K"].isin([1, 2]) & (reported | (lib["small_library"] == 1))).fillna(False).to_numpy(dtype=bool)
     print(f"{keep.sum():,} of {len(lib):,} institutions have an own library report; "
           f"{int(lib.loc[keep, 'small_library'].sum()):,} of them are below the $100K threshold")
 

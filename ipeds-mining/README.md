@@ -19,9 +19,29 @@ notebooks join against. Then run the analysis notebooks in order. `01` builds th
 table that `02`-`10` read, `04` and `05` write inputs for `10`, and `05` writes the peer
 groups that `06` uses if present.
 
-Tested with Python 3.14.3, pandas 3.0.5, numpy 2.5.3, scipy 1.18.1, scikit-learn 1.9.1,
-statsmodels 0.15.0, and matplotlib 3.11.2. The analysis dependencies are also available as
-`pip install -e ".[analysis]"`.
+Supports Python 3.10-3.12, matching the parent repository, with pandas 2.1 or later and
+matplotlib 3.10 or later. The analysis dependencies are also available as
+`pip install -e ".[analysis]"`. The saved notebook outputs come from Python 3.14.3 with
+pandas 3.0.5, numpy 2.5.3, scipy 1.18.1, scikit-learn 1.9.1, statsmodels 0.15.0, and
+matplotlib 3.11.2. All 22 notebooks were also run from a clean download in three further
+environments:
+
+| Environment | Result |
+|---|---|
+| Python 3.12, newest packages (pandas 3.0.6, scikit-learn 1.9.1) | Identical outputs |
+| Python 3.10, newest packages it supports (pandas 2.3.3, scikit-learn 1.7.2) | Identical except `06`-`08`, below |
+| Python 3.10, declared minimums (pandas 2.1.0, numpy 1.24.0, scipy 1.11.1, scikit-learn 1.3.0, statsmodels 0.14.0, matplotlib 3.10.0) | Identical except `06`-`08`, below |
+
+With scikit-learn older than 1.9, gradient-boosting and logistic-regression results move in
+the third decimal. Boosting RMSE in `07` is 0.214 instead of 0.213. False-negative rates by
+Pell tercile in `08` are 0.17/0.38/0.53 instead of 0.16/0.39/0.51. Two tied loadings in `06`
+print in a different order. No conclusion in the notebooks changes. The component notebooks
+and `01`-`05`, `09`, and `10` match exactly.
+
+The `ipeds-mining` workflow in `.github/workflows/` runs the offline tests on Python 3.10,
+3.11, and 3.12, plus a 3.10 job resolved to the declared minimums. It also checks that every
+committed analysis notebook matches its source in `tools/analysis_cells/`
+(`python tools/build_analysis_notebooks.py --check`).
 
 ## Layout
 

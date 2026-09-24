@@ -10,13 +10,15 @@ descriptive-trend baseline in `src/models/forecast_enrollment.py`.
 
 ## Contents
 
-| Path                     | Purpose                                                  |
-| ------------------------ | -------------------------------------------------------- |
-| `index.html`             | Markup and CDN dependencies (Chart.js, d3-array, d3-geo) |
-| `styles.css`             | Design tokens, light/dark themes, layout                 |
-| `app.js`                 | Data load, filtering, charts, map, table, detail drawer  |
-| `data/institutions.json` | 3,649 degree-granting institutions, 2024 primary year    |
-| `data/us-states.json`    | Pre-projected Albers USA state outlines as SVG paths     |
+| Path                           | Purpose                                                             |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `index.html`                   | Markup and CDN dependencies (Chart.js, d3-array, d3-geo)            |
+| `styles.css`                   | Design tokens, light/dark themes, layout                            |
+| `app.js`                       | Data load, filtering, charts, map, table, detail drawer             |
+| `data/institutions.json`       | 3,649 degree-granting institutions, 2024 primary year               |
+| `data/us-states.json`          | Pre-projected Albers USA state outlines as SVG paths                |
+| `colorado.html`, `colorado.js` | Colorado panel: formula funding and resident FTE by governing board |
+| `data/colorado.json`           | 13 governing boards, 29 institutions, FY2007-08 to FY2025-26        |
 
 ## Rebuilding the data
 
@@ -98,6 +100,40 @@ Median debt clusters at round amounts: $27,000 (174 institutions) equals the
 sum of the four annual Direct Loan limits for dependent undergraduates
 ($5,500 + $6,500 + $7,500 + $7,500).
 
+### Colorado panel
+
+`colorado.html` pairs Colorado Department of Higher Education (CDHE) resident
+FTE with the Joint Budget Committee's formula funding by governing board.
+
+```bash
+pip install -e ".[colorado]"   # pdfplumber
+python -m src.ingest.colorado  # reads PDFs in data/raw/cdhe/, writes data/colorado.json
+```
+
+The raw PDFs (CDHE FTE reports hed1538/1539/1540 and JBC briefings for
+FY2021-22 through FY2026-27) are listed with URLs in `src/ingest/colorado.py`
+and are gitignored. `tests/test_colorado.py` checks the parsers and pins the
+built file to published totals: $850.3M (FY2019-20), $357.1M plus the $450M
+federal Coronavirus Relief Fund backfill (FY2020-21), $1.298B (FY2025-26), and
+resident FTE of 148,445 (FY2024-25).
+
+Caveats:
+
+- CDHE FTE is state fiscal-year (July to June) FTE used by the funding formula,
+  not the IPEDS 12-month FTE in the national explorer. Board totals sum
+  institution rows and can differ from printed totals by 1 to 2 FTE.
+- Funding is the formula base: stipends, fee-for-service contracts, specialty
+  education and local district/area technical college grants. One-time funds
+  and the FY2025-26 Auraria Higher Education Center line are excluded.
+- The FY2020-21 federal backfill is shown as a separate hatched segment.
+- Real dollars use the BLS Denver-Aurora-Lakewood CPI-U averaged over each
+  fiscal year, in FY2025-26 dollars. A nominal toggle is available.
+- CU and CSU per-FTE figures include specialty education (medical, veterinary,
+  agricultural and forest services). Area technical colleges have no resident
+  FTE series and are excluded from per-FTE.
+- Deep links: `colorado.html#board=CU` focuses a board; `index.html#inst=126614`
+  opens an institution profile.
+
 ### 2024 refresh checks
 
 - Universe 3,688 → 3,649: 59 exits (39 for-profit, 19 nonprofit, 1 public;
@@ -165,6 +201,11 @@ cd dashboard && python3 -m http.server 8000
   or institution-level projection.
 
 ## Sources
+
+- [CDHE FTE Student Enrollment Reports](https://spl.cde.state.co.us/artemis/hedserials/)
+- [JBC Higher Education briefings](https://content.leg.colorado.gov/sites/default/files/fy2026-27_hedbrf.pdf) and [FY2026-27 Long Bill narrative](https://content.leg.colorado.gov/sites/default/files/26LBNarrativeA.pdf)
+- [CDHE funding formula](https://cdhe.colorado.gov/colorado-higher-education-funding-formula) and [HB26-1345](https://leg.colorado.gov/bills/hb26-1345)
+- [BLS Denver CPI](https://www.bls.gov/regions/mountain-plains/co_denver_msa.htm)
 
 - [NCES IPEDS](https://nces.ed.gov/ipeds/) and [survey components](https://nces.ed.gov/ipeds/survey-components)
 - [NCES IPEDS Complete Data Files](https://nces.ed.gov/ipeds/use-the-data)

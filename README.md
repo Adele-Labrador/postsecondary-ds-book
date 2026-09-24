@@ -7,8 +7,8 @@
 
 **Live dashboard:** [IPEDS Explorer](https://adele-labrador.github.io/postsecondary-ds-book/), an interactive view of 3,649 institutions built from IPEDS 2024–25 data (partly provisional) and College Scorecard earnings and debt (source in [`dashboard/`](dashboard/)).
 
-Reproducible starter code for the book *Data Science for Postsecondary Education
-Metrics*. This repo turns public [IPEDS](https://nces.ed.gov/ipeds/) survey
+Reproducible starter code for the book _Data Science for Postsecondary Education
+Metrics_. This repo turns public [IPEDS](https://nces.ed.gov/ipeds/) survey
 files into an institution-year feature store, then trains and validates a set
 of predictive ML tasks (institution-type classification, enrollment/graduation
 forecasting, institution segmentation) against published benchmarks such as
@@ -83,6 +83,14 @@ make data
 runs, in order: ingest each raw component → apply the `unitid` crosswalk →
 build engineered features → assemble the processed panel table.
 
+The Colorado panel data (`dashboard/data/colorado.json`) is built separately
+from state PDFs:
+
+```bash
+pip install -e ".[colorado]"
+python -m src.ingest.colorado
+```
+
 ## A note on real IPEDS variable codes
 
 The raw column names referenced in `src/ingest/` (e.g. `EFTOTLT`, `CONTROL`,
@@ -97,6 +105,7 @@ and the [Complete Data Files](https://nces.ed.gov/ipeds/use-the-data) page.
 - NCES IPEDS [Complete Data Files](https://nces.ed.gov/ipeds/use-the-data) (CSV, by survey and year)
 - [Urban Institute Education Data Portal API](https://educationdata.urban.org/documentation/) (programmatic alternative)
 - [Carnegie Classification of Institutions of Higher Education](https://carnegieclassifications.acenet.edu/)
+- [CDHE FTE Student Enrollment Reports](https://spl.cde.state.co.us/artemis/hedserials/) and Colorado JBC budget briefings (Colorado panel)
 - [NCES Statistical Standards](https://nces.ed.gov/pubs2003/2003601.pdf) (disclosure limitation, data-quality guidance)
 
 ## Contributing

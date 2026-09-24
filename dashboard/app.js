@@ -39,6 +39,8 @@ function paintThemeButton() {
     "aria-label",
     "Switch to " + (theme === "dark" ? "light" : "dark") + " mode",
   );
+  const co = document.getElementById("co-link");
+  if (co) co.href = "colorado.html#theme=" + theme;
 }
 
 document.documentElement.setAttribute("data-theme", theme);
@@ -361,6 +363,35 @@ async function boot() {
   buildControls();
   applyFilters();
   renderAll();
+
+  // Colorado state data (optional): resident FTE and governing board per UNITID.
+  try {
+    const co = await fetch("data/colorado.json").then((r) => r.json());
+    const years = co.meta.fteYears;
+    const boards = new Map(co.boards.map((b) => [b.id, b.name]));
+    state.colorado = new Map();
+    for (const inst of co.institutions) {
+      const rec = state.colorado.get(inst.unitid) || {
+        board: inst.board,
+        boardName: boards.get(inst.board),
+        year: years[years.length - 1],
+        resident: 0,
+        campuses: [],
+      };
+      rec.resident += inst.resident[years.length - 1] || 0;
+      rec.campuses.push(inst.name);
+      state.colorado.set(inst.unitid, rec);
+    }
+  } catch (err) {
+    state.colorado = null;
+  }
+
+  // Deep link from the Colorado panel: #inst=<UNITID> opens that profile.
+  const deep = /(?:^|[#&])inst=(\d+)/.exec(location.hash);
+  if (deep) {
+    const hit = state.all.find((d) => String(d.id) === deep[1]);
+    if (hit) openDrawer(hit);
+  }
 
   const loader = document.getElementById("loading");
   loader.classList.add("loading--out");
@@ -1853,6 +1884,7 @@ function openDrawer(d, keepScroll) {
     escapeHtml(scorecardFamilyNote(d)) +
     "Federal-aid recipients only; earnings of those working and not enrolled. " +
     "Cohorts differ by measure: see Sources &amp; method.</p></section>" +
+    coloradoHtml(d) +
     '<section class="dtl__section"><h3 class="dtl__h">Undergraduate FTE, ' +
     years[0] +
     "–" +
@@ -1893,6 +1925,32 @@ function openDrawer(d, keepScroll) {
 
   renderDetailChart(d, peers);
   renderTableSelection();
+}
+
+function coloradoHtml(d) {
+  const co = state.colorado && state.colorado.get(d.id);
+  if (!co) return "";
+  const theme = /(?:^|[#&])theme=(dark|light)\b/.exec(location.hash);
+  const href =
+    "colorado.html#board=" + co.board + (theme ? "&theme=" + theme[1] : "");
+  return (
+    '<section class="dtl__section"><h3 class="dtl__h">Colorado state data · CDHE</h3>' +
+    '<dl class="dtl__grid"><div class="dtl__metric"><dt>Resident FTE, ' +
+    escapeHtml(co.year.replace("FY ", "")) +
+    '</dt><dd class="mono">' +
+    co.resident.toLocaleString("en-US") +
+    '</dd></div><div class="dtl__metric"><dt>Governing board</dt><dd>' +
+    escapeHtml(co.boardName) +
+    '</dd></div></dl><p class="card__foot">' +
+    (co.campuses.length > 1
+      ? "Sums " +
+        escapeHtml(co.campuses.join(" and ")) +
+        ", which IPEDS reports as one unit. "
+      : "") +
+    'State fiscal-year FTE, not comparable to the IPEDS FTE above. <a href="' +
+    href +
+    '">Open the Colorado panel</a> for board funding and trends.</p></section>'
+  );
 }
 
 function tag(text, color) {

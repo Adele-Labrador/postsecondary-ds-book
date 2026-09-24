@@ -167,6 +167,55 @@
           </div>
         </section>
 
+        <section class="card" id="fin">
+          <div class="card__head card__head--wrap">
+            <div>
+              <h2 class="card__title">Campus finances · IPEDS</h2>
+              <p class="card__sub" id="fin-sub">
+                Revenue and spending per student FTE, by campus
+              </p>
+            </div>
+            <div class="co-controls co-controls--inline">
+              <label class="sel">
+                <span>Campus</span>
+                <select id="fin-unit" class="input input--sm"></select>
+              </label>
+              <div class="seg" role="radiogroup" aria-label="Spending basis">
+                <button class="seg__btn" data-basis="salaries" role="radio">
+                  Salaries &amp; wages
+                </button>
+                <button class="seg__btn" data-basis="total" role="radio">
+                  Total incl. benefits
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="grid2 grid2--flush">
+            <div>
+              <h3 class="fin__h" id="fin-rev-h">Core revenue per FTE</h3>
+              <div class="legend" id="fin-rev-legend"></div>
+              <div class="chartbox" id="fin-rev-box">
+                <canvas id="fin-rev"></canvas>
+              </div>
+            </div>
+            <div>
+              <h3 class="fin__h" id="fin-trend-h">Spending per FTE</h3>
+              <div class="legend" id="fin-trend-legend"></div>
+              <div class="chartbox chartbox--per">
+                <canvas id="fin-trend"></canvas>
+              </div>
+              <dl class="fin__stats" id="fin-stats"></dl>
+            </div>
+          </div>
+          <div class="tablewrap">
+            <table class="table" id="fin-table">
+              <thead></thead>
+              <tbody id="fin-tbody"></tbody>
+            </table>
+          </div>
+          <p class="card__foot" id="fin-foot"></p>
+        </section>
+
         <section class="card">
           <div class="card__head">
             <div>

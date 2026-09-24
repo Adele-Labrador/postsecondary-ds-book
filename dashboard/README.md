@@ -19,6 +19,7 @@ descriptive-trend baseline in `src/models/forecast_enrollment.py`.
 | `data/us-states.json`          | Pre-projected Albers USA state outlines as SVG paths                |
 | `colorado.html`, `colorado.js` | Colorado panel: formula funding and resident FTE by governing board |
 | `data/colorado.json`           | 13 governing boards, 29 institutions, FY2007-08 to FY2025-26        |
+| `data/colorado_finance.json`   | IPEDS finance + FTE for 27 Colorado units, FY2014-15 to FY2023-24   |
 
 ## Rebuilding the data
 
@@ -116,6 +117,40 @@ and are gitignored. `tests/test_colorado.py` checks the parsers and pins the
 built file to published totals: $850.3M (FY2019-20), $357.1M plus the $450M
 federal Coronavirus Relief Fund backfill (FY2020-21), $1.298B (FY2025-26), and
 resident FTE of 148,445 (FY2024-25).
+
+#### Campus finances (IPEDS)
+
+The "Campus finances · IPEDS" section adds revenue and spending per student
+FTE for each public campus from the IPEDS Finance survey (GASB form F1A,
+`F1415_F1A` to `F2324_F1A`) and 12-month enrollment (`EFIA2015` to
+`EFIA2024`), downloaded from the
+[IPEDS complete data files](https://nces.ed.gov/ipeds/use-the-data).
+
+```bash
+python -m src.ingest.colorado_finance  # writes data/colorado_finance.json
+```
+
+- FTE is `FTEUG + FTEGD`, the NCES convention for per-FTE finance measures.
+- Revenue per FTE stacks net tuition and fees (F1B01), state operating grants,
+  contracts and appropriations (F1B03 + F1B11 + F1B14), local appropriations
+  (F1B12) and federal nonoperating grants (F1B13, mostly Pell).
+- Colorado sends state money through College Opportunity Fund stipends, which
+  campuses book as tuition, and fee-for-service contracts, booked as state
+  grants and contracts. IPEDS therefore cannot isolate formula funding; use
+  the CDHE and JBC charts above for that.
+- Campuses in PERA carry large non-cash pension and OPEB accruals (GASB 68/75)
+  in fringe benefits, which swing by tens of millions a year and sometimes go
+  negative. The default trend view uses salaries and wages by function
+  (F1C012, F1C052, F1C062); "Total incl. benefits" shows the full function
+  totals.
+- Real dollars use the semiannual Denver-Aurora-Lakewood CPI-U (BLS
+  CUUSS48BSA0), because the monthly series has no values from 1987 to late
+  2017. Values are then carried to FY2025-26 dollars with the page's factor.
+- IPEDS unit 126562 combines CU Denver and the Anschutz Medical Campus, and
+  126818 includes CSU's veterinary school and state agencies, so their
+  per-FTE figures are high. FY2023-24 is provisional until NCES issues the
+  revised file.
+- Revenue and spending per FTE measure resources, not cost or efficiency.
 
 Caveats:
 

@@ -120,7 +120,14 @@ const IPEDS_LABEL = {
 };
 const SPECIALTY = new Set(["CU", "CSU"]);
 
-const state = { data: null, board: "ALL", dollars: "real" };
+const state = {
+  data: null,
+  fin: null,
+  board: "ALL",
+  dollars: "real",
+  unit: null,
+  basis: "salaries",
+};
 const charts = {};
 
 /* ── Data access ───────────────────────────────────────────────────────── */
@@ -213,7 +220,7 @@ function axis(base, title, fmt, extra) {
         font: { family: "'JetBrains Mono', monospace", size: 10 },
         maxRotation: 0,
         autoSkipPadding: 10,
-        callback: fmt,
+        ...(fmt ? { callback: fmt } : {}),
       },
     },
     extra || {},
@@ -303,7 +310,16 @@ const groupColor = (i) => css("--co-" + i);
 
 /* ── Boot ──────────────────────────────────────────────────────────────── */
 async function boot() {
-  state.data = await fetch("data/colorado.json").then((r) => r.json());
+  const [data, fin] = await Promise.all([
+    fetch("data/colorado.json").then((r) => r.json()),
+    fetch("data/colorado_finance.json")
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null),
+  ]);
+  state.data = data;
+  state.fin = fin;
+  if (fin) setupFinance();
+  else document.getElementById("fin").hidden = true;
   const ids = state.data.boards.map((b) => b.id);
   const b = hashGet("board");
   state.board = ids.includes(b) ? b : "ALL";
@@ -356,6 +372,7 @@ function renderAll() {
   renderFte();
   renderPer();
   renderTable();
+  renderFinance();
 }
 
 /* ── KPIs ──────────────────────────────────────────────────────────────── */
@@ -1014,6 +1031,429 @@ function renderFoot() {
     "; built " +
     escapeHtml(state.data.meta.built) +
     ".</li></ul>";
+}
+
+/* ── Campus finances (IPEDS F1A) ───────────────────────────────────────── */
+const REV_PARTS = [
+  { key: "tuition", label: "Net tuition & fees (incl. COF stipend)", color: 0 },
+  { key: "state", label: "State grants, contracts & appropriations", color: 1 },
+  { key: "local", label: "Local district taxes", color: 2 },
+  { key: "federal", label: "Federal student grants (mostly Pell)", color: 4 },
+];
+const TREND = {
+  salaries: [
+    { key: "instructionSalaries", label: "Instruction", color: 0 },
+    { key: "academicSupportSalaries", label: "Academic support", color: 5 },
+    { key: "studentServicesSalaries", label: "Student services", color: 1 },
+  ],
+  total: [
+    { key: "instruction", label: "Instruction", color: 0 },
+    { key: "academicSupport", label: "Academic support", color: 5 },
+    { key: "studentServices", label: "Student services", color: 1 },
+    { key: "institutionalSupport", label: "Institutional support", color: 6 },
+  ],
+};
+
+function finYears() {
+  return state.fin.meta.years;
+}
+// Finance dollars share the page's FY2025-26 base: IPEDS values are first put
+// in FY2023-24 dollars (semiannual Denver CPI), then carried to FY2025-26
+// with the same factor the funding charts use.
+function finFactor(i) {
+  if (state.dollars === "nominal") return 1;
+  return state.fin.meta.deflator[i] * state.data.meta.deflator["FY 2023-24"];
+}
+function finPer(u, key, i) {
+  const v = u[key][i];
+  const f = u.fte[i];
+  return v == null || !f ? null : (v * finFactor(i)) / f;
+}
+function finUnits() {
+  const all = state.fin.units;
+  return state.board === "ALL"
+    ? all
+    : all.filter((u) => u.board === state.board);
+}
+function finUnit() {
+  return state.fin.units.find((u) => u.unitid === state.unit);
+}
+function shortUnit(n) {
+  return n
+    .replace("University of Colorado ", "CU ")
+    .replace(
+      "Colorado State University (Fort Collins, incl. vet med)",
+      "CSU Fort Collins",
+    )
+    .replace("Colorado State University Pueblo", "CSU Pueblo")
+    .replace("Metropolitan State University of Denver", "MSU Denver")
+    .replace("University of Northern Colorado", "Northern Colorado")
+    .replace("Colorado School of Mines", "Mines")
+    .replace(" Community College", " CC")
+    .replace("Community College of ", "CC of ")
+    .replace(" University", "");
+}
+function coreRevenue(u, i) {
+  return REV_PARTS.reduce((s, p) => s + (finPer(u, p.key, i) || 0), 0);
+}
+
+function setupFinance() {
+  const sel = document.getElementById("fin-unit");
+  const boards = state.fin.meta.boards;
+  const byBoard = {};
+  state.fin.units.forEach((u) =>
+    (byBoard[u.board] = byBoard[u.board] || []).push(u),
+  );
+  sel.innerHTML = Object.keys(byBoard)
+    .map(
+      (b) =>
+        '<optgroup label="' +
+        escapeHtml(boards[b]) +
+        '">' +
+        byBoard[b]
+          .map(
+            (u) =>
+              '<option value="' +
+              u.unitid +
+              '">' +
+              escapeHtml(shortUnit(u.name)) +
+              "</option>",
+          )
+          .join("") +
+        "</optgroup>",
+    )
+    .join("");
+  sel.addEventListener("change", () => setUnit(Number(sel.value)));
+  document.querySelectorAll("[data-basis]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      state.basis = btn.dataset.basis;
+      hashSet("basis", state.basis === "salaries" ? null : state.basis);
+      renderFinance();
+    }),
+  );
+  const ids = state.fin.units.map((u) => u.unitid);
+  const c = Number(hashGet("campus"));
+  state.unit = ids.includes(c) ? c : null;
+  state.basis = hashGet("basis") === "total" ? "total" : "salaries";
+}
+
+function setUnit(id) {
+  state.unit = id;
+  hashSet("campus", String(id));
+  renderFinance();
+}
+
+function renderFinance() {
+  if (!state.fin) return;
+  const units = finUnits();
+  if (!units.some((u) => u.unitid === state.unit)) {
+    state.unit = units[0].unitid;
+    if (hashGet("campus")) hashSet("campus", String(state.unit));
+  }
+  document.getElementById("fin-unit").value = String(state.unit);
+  document.querySelectorAll("[data-basis]").forEach((btn) => {
+    const on = btn.dataset.basis === state.basis;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-checked", on ? "true" : "false");
+  });
+  const last = finYears().length - 1;
+  const yr = shortFy(finYears()[last]);
+  const prov = state.fin.meta.provisional.includes(finYears()[last])
+    ? " (provisional)"
+    : "";
+  document.getElementById("fin-sub").textContent =
+    selectedLabel() + " · " + units.length + " IPEDS units · " + dollarsLabel();
+  document.getElementById("fin-rev-h").textContent =
+    "Core revenue per FTE, " + yr + prov;
+  renderFinRevenue(units, last);
+  renderFinTrend();
+  renderFinTable(units, last);
+  renderFinFoot();
+}
+
+function renderFinRevenue(units, i) {
+  destroy("finRev");
+  const base = chartBase();
+  const rows = units
+    .slice()
+    .sort((a, b) => coreRevenue(b, i) - coreRevenue(a, i));
+  document.getElementById("fin-rev-box").style.height =
+    Math.max(12, rows.length * 1.35 + 4) + "rem";
+  document.getElementById("fin-rev-legend").innerHTML = legendHtml(
+    REV_PARTS.map((p) => ({ label: p.label, color: groupColor(p.color) })),
+  );
+  const alpha = (u) => (u.unitid === state.unit ? "ff" : "b3");
+  charts.finRev = new Chart(document.getElementById("fin-rev"), {
+    type: "bar",
+    data: {
+      labels: rows.map((u) => shortUnit(u.name)),
+      datasets: REV_PARTS.map((p) => ({
+        label: p.label,
+        data: rows.map((u) => finPer(u, p.key, i)),
+        backgroundColor: rows.map((u) => groupColor(p.color) + alpha(u)),
+        borderColor: css("--color-surface"),
+        borderWidth: { right: 1 },
+        barPercentage: 0.8,
+        categoryPercentage: 0.9,
+      })),
+    },
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      onClick: (_e, els) => {
+        if (!els.length) return;
+        const id = rows[els[0].index].unitid;
+        setTimeout(() => setUnit(id), 0);
+      },
+      onHover: (e, els) =>
+        (e.native.target.style.cursor = els.length ? "pointer" : "default"),
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...base.tooltip,
+          callbacks: {
+            label: (c) => " " + c.dataset.label + ": " + money(c.parsed.x),
+            footer: (items) =>
+              "Core total: " + money(coreRevenue(rows[items[0].dataIndex], i)),
+          },
+        },
+      },
+      scales: {
+        x: axis(
+          base,
+          "per FTE, " + dollarsLabel(),
+          (v) => "$" + v / 1000 + "k",
+          {
+            stacked: true,
+          },
+        ),
+        y: axis(base, null, undefined, {
+          stacked: true,
+          grid: { display: false },
+          ticks: {
+            color: base.text,
+            autoSkip: false,
+            font: (ctx) => ({
+              family: "'Satoshi', sans-serif",
+              size: 11,
+              weight:
+                rows[ctx.index] && rows[ctx.index].unitid === state.unit
+                  ? "700"
+                  : "400",
+            }),
+          },
+        }),
+      },
+    },
+  });
+}
+
+function renderFinTrend() {
+  destroy("finTrend");
+  const base = chartBase();
+  const u = finUnit();
+  const parts = TREND[state.basis];
+  const labels = finYears().map(shortFy);
+  document.getElementById("fin-trend-h").textContent =
+    (state.basis === "salaries" ? "Salaries & wages" : "Spending") +
+    " per FTE · " +
+    shortUnit(u.name);
+  document.getElementById("fin-trend-legend").innerHTML = legendHtml(
+    parts.map((p) => ({ label: p.label, color: groupColor(p.color) })),
+  );
+  const last = labels.length - 1;
+  charts.finTrend = new Chart(document.getElementById("fin-trend"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: parts.map((p) => ({
+        label: p.label,
+        data: labels.map((_, i) => finPer(u, p.key, i)),
+        borderColor: groupColor(p.color),
+        backgroundColor: groupColor(p.color),
+        borderWidth: p.key.startsWith("instruction") ? 2.5 : 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.25,
+        segment: {
+          borderDash: (c) =>
+            state.fin.meta.provisional.includes(finYears()[c.p1DataIndex])
+              ? [4, 3]
+              : undefined,
+        },
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          ...base.tooltip,
+          callbacks: {
+            label: (c) => " " + c.dataset.label + ": " + money(c.parsed.y),
+          },
+        },
+      },
+      scales: {
+        x: axis(base, null),
+        y: axis(
+          base,
+          "per FTE, " + dollarsLabel(),
+          (v) => "$" + v / 1000 + "k",
+          {
+            beginAtZero: true,
+          },
+        ),
+      },
+    },
+  });
+
+  const instrKey = parts[0].key;
+  const ssKey = parts[2].key;
+  const stat = (label, value, note) =>
+    '<div class="dtl__metric"><dt>' +
+    label +
+    '</dt><dd class="mono">' +
+    value +
+    "</dd>" +
+    (note ? '<dd class="fin__note">' + note + "</dd>" : "") +
+    "</div>";
+  const chg = (k) => change(finPer(u, k, 0), finPer(u, k, last));
+  const fteChg = change(u.fte[0], u.fte[last]);
+  document.getElementById("fin-stats").innerHTML =
+    stat(
+      "FTE " + labels[last],
+      int(u.fte[last]),
+      pct(fteChg) + " since " + labels[0],
+    ) +
+    stat(
+      "Instruction / FTE",
+      money(finPer(u, instrKey, last)),
+      pct(chg(instrKey)) + " real since " + labels[0],
+    ) +
+    stat(
+      "Student services / FTE",
+      money(finPer(u, ssKey, last)),
+      pct(chg(ssKey)) + " real since " + labels[0],
+    ) +
+    stat(
+      "Tuition discount rate",
+      u.discountRate[last] == null
+        ? "—"
+        : (u.discountRate[last] * 100).toFixed(1) + "%",
+      "of gross tuition & fees",
+    );
+}
+
+function renderFinTable(units, i) {
+  const basis = state.basis;
+  const instr = basis === "salaries" ? "instructionSalaries" : "instruction";
+  const ss =
+    basis === "salaries" ? "studentServicesSalaries" : "studentServices";
+  const y0 = shortFy(finYears()[0]);
+  const yN = shortFy(finYears()[i]);
+  const what = basis === "salaries" ? " salaries" : "";
+  document.querySelector("#fin-table thead").innerHTML =
+    "<tr><th>Campus</th><th class='num'>FTE " +
+    yN +
+    "</th><th class='num'>Core revenue / FTE</th><th class='num'>State share</th><th class='num'>Instruction" +
+    what +
+    " / FTE</th><th class='num'>Change since " +
+    y0 +
+    "</th><th class='num'>Student services" +
+    what +
+    " / FTE</th><th class='num'>Change since " +
+    y0 +
+    "</th><th class='num'>Discount rate</th></tr>";
+  const delta = (v) =>
+    v == null
+      ? NA
+      : Math.abs(v) < 0.0005
+        ? "0.0%"
+        : '<span class="' +
+          (v > 0.005 ? "pos" : v < -0.005 ? "neg" : "") +
+          '">' +
+          pct(v) +
+          "</span>";
+  const rows = units
+    .slice()
+    .sort((a, b) => b.fte[i] - a.fte[i])
+    .map((u) => {
+      const core = coreRevenue(u, i);
+      const st = finPer(u, "state", i);
+      return (
+        '<tr data-unit="' +
+        u.unitid +
+        '" tabindex="0"' +
+        (u.unitid === state.unit ? ' aria-selected="true"' : "") +
+        '><td class="cell-name">' +
+        escapeHtml(shortUnit(u.name)) +
+        ' <a class="fin__ipeds" data-inst="' +
+        u.unitid +
+        '" href="index.html#inst=' +
+        u.unitid +
+        '" title="Open the IPEDS profile">profile</a></td><td class="num mono">' +
+        int(u.fte[i]) +
+        '</td><td class="num mono">' +
+        money(core) +
+        '</td><td class="num mono">' +
+        (core ? Math.round((st / core) * 100) + "%" : "—") +
+        '</td><td class="num mono">' +
+        money(finPer(u, instr, i)) +
+        '</td><td class="num mono">' +
+        delta(change(finPer(u, instr, 0), finPer(u, instr, i))) +
+        '</td><td class="num mono">' +
+        money(finPer(u, ss, i)) +
+        '</td><td class="num mono">' +
+        delta(change(finPer(u, ss, 0), finPer(u, ss, i))) +
+        '</td><td class="num mono">' +
+        (u.discountRate[i] == null
+          ? "—"
+          : (u.discountRate[i] * 100).toFixed(0) + "%") +
+        "</td></tr>"
+      );
+    })
+    .join("");
+  const tbody = document.getElementById("fin-tbody");
+  tbody.innerHTML = rows;
+  tbody.querySelectorAll("tr").forEach((tr) => {
+    const pick = (e) => {
+      if (e.target.closest("a")) return;
+      setUnit(Number(tr.dataset.unit));
+    };
+    tr.addEventListener("click", pick);
+    tr.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        pick(e);
+      }
+    });
+  });
+  syncLinks();
+}
+
+function renderFinFoot() {
+  const m = state.fin.meta;
+  const prov = m.provisional.length
+    ? " " +
+      m.provisional.map(shortFy).join(", ") +
+      " is provisional (NCES has not yet issued the revised file) and is drawn dashed."
+    : "";
+  document.getElementById("fin-foot").innerHTML =
+    "IPEDS Finance (public institutions, GASB form F1A) with 12-month FTE (undergraduate + graduate) for the same year, " +
+    shortFy(m.years[0]) +
+    " to " +
+    shortFy(m.years[m.years.length - 1]) +
+    "." +
+    prov +
+    " Colorado routes state support through College Opportunity Fund stipends, which campuses book as tuition, and fee-for-service contracts, booked as state grants and contracts, so IPEDS cannot isolate formula funding. " +
+    "PERA pension accounting puts large non-cash swings into benefits, so the salaries view is the steadier trend. " +
+    "CU Denver | Anschutz and CSU Fort Collins include medical and veterinary schools. Click a bar or row to change campus.";
 }
 
 boot().catch((err) => {

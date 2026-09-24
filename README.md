@@ -89,6 +89,7 @@ from state PDFs:
 ```bash
 pip install -e ".[colorado]"
 python -m src.ingest.colorado
+python -m src.ingest.colorado_finance   # IPEDS campus finances
 ```
 
 ## A note on real IPEDS variable codes

@@ -1158,6 +1158,10 @@ select.input {
   margin-top: 2px;
 }
 
+.dtl__held {
+  color: var(--color-text-muted);
+}
+
 .is-small {
   color: var(--color-text-muted);
   text-decoration: underline dotted;

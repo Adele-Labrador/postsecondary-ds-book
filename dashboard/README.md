@@ -64,6 +64,40 @@ component (`COST1_{Y}`); the `TUITION*`/`FEE*` variables are unchanged. See the
 [IPEDS data release schedule](https://nces.ed.gov/ipeds/survey-components/data-release-schedule)
 for when the provisional files become final.
 
+### College Scorecard earnings and debt
+
+`src/ingest/scorecard.py` merges three outcome measures from the
+[College Scorecard](https://collegescorecard.ed.gov/data/) "Most Recent
+Institution-Level Data" file (June 10, 2026 release) by UNITID. The merge
+matches 3,645 of the 3,649 institutions; `--no-scorecard` skips it.
+
+| Field          | Scorecard variable | Cohort                                                               |
+| -------------- | ------------------ | -------------------------------------------------------------------- |
+| `earnings4yr`  | `MD_EARN_WNE_4YR`  | Completers of 2017–18 and 2018–19, earnings in 2022–23, 2024 dollars |
+| `earnings10yr` | `MD_EARN_WNE_P10`  | Entrants of 2009–10 and 2010–11, earnings in 2020–21, 2022 dollars   |
+| `gradDebt`     | `GRAD_DEBT_MDN`    | Completers entering repayment in FY2020–21                           |
+
+The cohorts come from the data dictionary's `Most_Recent_Inst_Cohort_Map`
+sheet. All three cover federal (Title IV) aid recipients only, and earnings
+cover those working and not enrolled. The 10-year measure follows every
+entrant, including those who never finished, so it reflects both completion
+and labor-market outcomes. The 4-year measure covers completers only.
+Earnings are not adjusted for regional cost of living or program mix.
+
+**Shared campus values.** Scorecard reports earnings and debt for a whole
+6-digit OPEID family, so a main campus and its branches carry identical values:
+536 campuses in 132 families, including all 21 Penn State campuses. Each
+family counts once in medians, charts, the map and benchmarks, on its main
+campus (Scorecard `MAIN == 1`, else the largest by FTE). Branches show the
+shared value in grey. After this rule, 2,956 institutions contribute 4-year
+earnings, 2,947 contribute 10-year earnings, and 2,724 contribute debt.
+
+Spot checks against the Scorecard API matched exactly for CU Boulder
+($76,850 / $69,738 / $19,500), the University of Denver, and UC Berkeley.
+Median debt clusters at round amounts: $27,000 (174 institutions) equals the
+sum of the four annual Direct Loan limits for dependent undergraduates
+($5,500 + $6,500 + $7,500 + $7,500).
+
 ### 2024 refresh checks
 
 - Universe 3,688 → 3,649: 59 exits (39 for-profit, 19 nonprofit, 1 public;

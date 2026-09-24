@@ -147,6 +147,24 @@ const METRICS = {
     fmt: fmt.usd,
     axis: fmt.usdK,
   },
+  earnings4yr: {
+    label: "Median earnings, 4 yrs after completion",
+    short: "Earnings",
+    fmt: fmt.usd,
+    axis: fmt.usdK,
+  },
+  earnings10yr: {
+    label: "Median earnings, 10 yrs after entry",
+    short: "Earnings (entry)",
+    fmt: fmt.usd,
+    axis: fmt.usdK,
+  },
+  gradDebt: {
+    label: "Median debt at completion",
+    short: "Debt",
+    fmt: fmt.usd,
+    axis: fmt.usdK,
+  },
   cagr: {
     label: "Enrollment growth (annualized)",
     short: "Growth",
@@ -260,11 +278,19 @@ const COHORT_RATES = [
   ["gradRate", "gradCohort"],
   ["retention", "retCohort"],
 ];
-const smallCohort = (d, key) => d[key] == null && d[key + "Small"] != null;
-const cohortNote = (d, key) => {
-  const pair = COHORT_RATES.find(([k]) => k === key);
-  return pair ? "Cohort of " + d[pair[1]] + " — too small to compare" : "";
-};
+// College Scorecard reports earnings and debt for a whole 6-digit OPEID family
+// (main campus plus branches), so every campus carries the same value. Each
+// family counts once in aggregates, on its anchor campus; branches show the
+// shared value but are held out like small cohorts.
+const SCORECARD_KEYS = ["earnings4yr", "earnings10yr", "gradDebt"];
+// A held-out value is visible in the table and profile, never in aggregates.
+const held = (d, key) => d[key] == null && d[key + "Held"] != null;
+const heldNote = (d, key) => (d.heldNote && d.heldNote[key]) || "";
+function holdOut(d, key, note) {
+  d[key + "Held"] = d[key];
+  d[key] = null;
+  (d.heldNote ||= {})[key] = note;
+}
 async function boot() {
   const [panel, map] = await Promise.all([
     fetch("data/institutions.json").then((r) => r.json()),
@@ -297,10 +323,12 @@ async function boot() {
         : null;
     d.complete = s.every((v) => v != null);
     for (const [key, cohortKey] of COHORT_RATES) {
-      if (d[key] != null && d[cohortKey] != null && d[cohortKey] < MIN_COHORT) {
-        d[key + "Small"] = d[key];
-        d[key] = null;
-      }
+      if (d[key] != null && d[cohortKey] != null && d[cohortKey] < MIN_COHORT)
+        holdOut(
+          d,
+          key,
+          "Cohort of " + d[cohortKey] + " — too small to compare",
+        );
     }
     d.searchKey = (
       (d.name || "") +
@@ -311,6 +339,24 @@ async function boot() {
     ).toLowerCase();
     return d;
   });
+
+  const anchors = new Map();
+  for (const d of state.all)
+    if (d.scAnchor && d.scShared > 1) anchors.set(d.opeid6, d.name);
+  for (const d of state.all) {
+    if (!(d.scShared > 1)) continue;
+    for (const key of SCORECARD_KEYS) {
+      if (d[key] == null || d.scAnchor) continue;
+      holdOut(
+        d,
+        key,
+        "Reported for " +
+          d.scShared +
+          " campuses together; counted once, under " +
+          anchors.get(d.opeid6),
+      );
+    }
+  }
 
   buildControls();
   applyFilters();
@@ -388,6 +434,14 @@ function buildControls() {
   document.getElementById("foot-gradyear").textContent =
     meta.gradYear ?? meta.primaryYear;
   renderProvisional(meta);
+  const sc = meta.scorecard;
+  if (sc) {
+    document.getElementById("foot-screlease").textContent = sc.release;
+    document.getElementById("foot-sccohorts").textContent =
+      SCORECARD_KEYS.map(
+        (k) => METRICS[k].label.replace("Median ", "") + ": " + sc.cohorts[k],
+      ).join("; ") + ".";
+  }
 
   // Control chips with counts
   const controlBox = document.getElementById("f-control");
@@ -1464,6 +1518,8 @@ const COLUMNS = [
   { key: "admitRate", label: "Admit" },
   { key: "pellPct", label: "Pell" },
   { key: "tuitionIn", label: "Tuition (in)" },
+  { key: "earnings4yr", label: "Earnings" },
+  { key: "gradDebt", label: "Debt" },
   { key: "cagr", label: "Growth" },
   { key: "series", label: "Trend", type: "spark", sortable: false },
 ];
@@ -1551,12 +1607,12 @@ function renderTable() {
       } else if (col.type === "spark") {
         td.innerHTML = sparkline(d.series);
       } else {
-        if (smallCohort(d, col.key)) {
+        if (held(d, col.key)) {
           td.innerHTML =
             '<span class="is-small">' +
-            METRICS[col.key].fmt(d[col.key + "Small"]) +
+            METRICS[col.key].fmt(d[col.key + "Held"]) +
             "</span>";
-          td.title = cohortNote(d, col.key);
+          td.title = heldNote(d, col.key);
         } else td.innerHTML = or(METRICS[col.key].fmt(d[col.key]));
       }
       row.append(td);
@@ -1699,7 +1755,44 @@ const DRAWER_METRICS = [
   "tuitionOut",
   "cagr",
 ];
-const BENCH_METRICS = ["gradRate", "retention", "sfr", "pellPct", "tuitionIn"];
+const BENCH_METRICS = [
+  "gradRate",
+  "retention",
+  "sfr",
+  "pellPct",
+  "tuitionIn",
+  "earnings4yr",
+  "gradDebt",
+];
+
+// quiet: omit the per-card note (the Scorecard section explains sharing once).
+function drawerMetric(d, k, quiet) {
+  const note = !quiet && held(d, k) ? heldNote(d, k) : "";
+  return (
+    '<div class="dtl__metric"><dt>' +
+    METRICS[k].label +
+    "</dt><dd>" +
+    (held(d, k)
+      ? '<span class="dtl__held">' + METRICS[k].fmt(d[k + "Held"]) + "</span>"
+      : or(METRICS[k].fmt(d[k]))) +
+    (note ? '<span class="dtl__note">' + escapeHtml(note) + "</span>" : "") +
+    "</dd></div>"
+  );
+}
+
+function scorecardFamilyNote(d) {
+  if (!(d.scShared > 1)) return "";
+  const anchor = state.all.find((x) => x.opeid6 === d.opeid6 && x.scAnchor);
+  return d.scAnchor
+    ? "These values cover " +
+        d.scShared +
+        " campuses that report to the Scorecard together. "
+    : "Shared by " +
+        d.scShared +
+        " campuses that report together, so they are counted once, under " +
+        (anchor ? anchor.name : "the main campus") +
+        ". ";
+}
 
 function openDrawer(d, keepScroll) {
   state.selected = d;
@@ -1751,21 +1844,15 @@ function openDrawer(d, keepScroll) {
         k !== "tuitionDistrict" ||
         (d.tuitionDistrict != null && d.tuitionDistrict !== d.tuitionIn),
     )
-      .map(
-        (k) =>
-          '<div class="dtl__metric"><dt>' +
-          METRICS[k].label +
-          "</dt><dd>" +
-          (smallCohort(d, k)
-            ? METRICS[k].fmt(d[k + "Small"]) +
-              '<span class="dtl__note">' +
-              cohortNote(d, k) +
-              "</span>"
-            : or(METRICS[k].fmt(d[k]))) +
-          "</dd></div>",
-      )
+      .map((k) => drawerMetric(d, k))
       .join("") +
     "</dl></section>" +
+    '<section class="dtl__section"><h3 class="dtl__h">Earnings &amp; debt · College Scorecard</h3><dl class="dtl__grid">' +
+    SCORECARD_KEYS.map((k) => drawerMetric(d, k, true)).join("") +
+    '</dl><p class="card__foot">' +
+    escapeHtml(scorecardFamilyNote(d)) +
+    "Federal-aid recipients only; earnings of those working and not enrolled. " +
+    "Cohorts differ by measure: see Sources &amp; method.</p></section>" +
     '<section class="dtl__section"><h3 class="dtl__h">Undergraduate FTE, ' +
     years[0] +
     "–" +
@@ -1997,6 +2084,11 @@ function exportCsv() {
     "admitRate",
     "yieldRate",
     "pellPct",
+    "earnings4yr",
+    "earnings10yr",
+    "gradDebt",
+    "opeid6",
+    "scShared",
     "pellAvg",
     "tuitionDistrict",
     "tuitionIn",
@@ -2013,7 +2105,7 @@ function exportCsv() {
   const body = state.view
     .map((d) =>
       [
-        ...keys.map((k) => cell(d[k] ?? d[k + "Small"])),
+        ...keys.map((k) => cell(d[k] ?? d[k + "Held"])),
         ...d.series.map((v) => cell(v)),
       ].join(","),
     )

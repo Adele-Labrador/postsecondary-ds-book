@@ -358,17 +358,38 @@ def main(argv: list[str] | None = None) -> None:
         action="store_true",
         help="re-download cached NCES archives to pick up revised releases",
     )
+    parser.add_argument(
+        "--no-scorecard",
+        action="store_true",
+        help="skip the College Scorecard earnings and debt merge",
+    )
     args = parser.parse_args(argv)
 
     payload = build(args.year, args.aid_year, args.grad_file_year, refresh=args.refresh)
     if not payload["institutions"]:
         raise SystemExit("No records assembled -- check component files.")
+    if not args.no_scorecard:
+        from src.ingest import scorecard
+
+        payload["meta"]["scorecard"] = scorecard.attach(payload["institutions"], scorecard.fetch())
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(payload, separators=(",", ":")))
+    # allow_nan=False: NaN is not valid JSON and breaks the dashboard's fetch.
+    args.out.write_text(json.dumps(payload, separators=(",", ":"), allow_nan=False))
     recs = payload["institutions"]
     print(f"Wrote {args.out} ({len(recs):,} institutions, {args.out.stat().st_size / 1e6:.2f} MB)")
-    for key in ("sfr", "gradRate", "admitRate", "retention", "tuitionIn", "pellPct", "lat"):
-        print(f"  {key:10} {sum(r[key] is not None for r in recs):,}")
+    for key in (
+        "sfr",
+        "gradRate",
+        "admitRate",
+        "retention",
+        "tuitionIn",
+        "pellPct",
+        "earnings4yr",
+        "earnings10yr",
+        "gradDebt",
+        "lat",
+    ):
+        print(f"  {key:12} {sum(r.get(key) is not None for r in recs):,}")
 
 
 if __name__ == "__main__":

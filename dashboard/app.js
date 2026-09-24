@@ -155,6 +155,12 @@ const CONTROLS = [
   { key: "Private for-profit", varName: "--c-forprofit" },
 ];
 
+const LEVELS = [
+  { key: "4-year or above", label: "4-year", short: "4-yr" },
+  { key: "2-year", label: "2-year", short: "2-yr" },
+];
+const levelLabel = (key) => (LEVELS.find((l) => l.key === key) || {}).label;
+
 const controlColor = (c) => {
   const hit = CONTROLS.find((x) => x.key === c);
   return css(hit ? hit.varName : "--c-other");
@@ -171,6 +177,7 @@ const state = {
   filters: {
     q: "",
     controls: new Set(),
+    levels: new Set(),
     families: new Set(),
     state: "",
     minFte: 0,
@@ -307,6 +314,14 @@ function buildControls() {
     controlBox.append(
       chip(key, n, () => toggle(state.filters.controls, key), css(varName)),
     );
+  });
+
+  // Level chips: 4-year and 2-year graduation rates use different clocks
+  const levelBox = document.getElementById("f-level");
+  LEVELS.forEach(({ key, label }) => {
+    const n = all.filter((d) => d.level === key).length;
+    if (n)
+      levelBox.append(chip(label, n, () => toggle(state.filters.levels, key)));
   });
 
   // Carnegie family chips
@@ -459,6 +474,7 @@ function resetFilters() {
   state.filters = {
     q: "",
     controls: new Set(),
+    levels: new Set(),
     families: new Set(),
     state: "",
     minFte: 0,
@@ -480,6 +496,7 @@ function applyFilters() {
   state.view = state.all.filter((d) => {
     if (f.q && !d.searchKey.includes(f.q)) return false;
     if (f.controls.size && !f.controls.has(d.control)) return false;
+    if (f.levels.size && !f.levels.has(d.level)) return false;
     if (f.families.size && !f.families.has(d.family)) return false;
     if (f.state && d.state !== f.state) return false;
     if (f.minFte && (d.fte || 0) < f.minFte) return false;
@@ -514,6 +531,9 @@ function renderChips() {
   const items = [];
   if (f.q) items.push(['Search: "' + f.q + '"', () => (f.q = "")]);
   f.controls.forEach((c) => items.push([c, () => f.controls.delete(c)]));
+  f.levels.forEach((c) =>
+    items.push([levelLabel(c), () => f.levels.delete(c)]),
+  );
   f.families.forEach((c) => items.push([c, () => f.families.delete(c)]));
   if (f.state) items.push(["State: " + f.state, () => (f.state = "")]);
   if (f.minFte)
@@ -566,6 +586,10 @@ function syncChipButtons() {
   document.querySelectorAll("#f-control .chip").forEach((b) => {
     b.setAttribute("aria-pressed", String(f.controls.has(label(b))));
   });
+  document.querySelectorAll("#f-level .chip").forEach((b) => {
+    const key = (LEVELS.find((l) => l.label === label(b)) || {}).key;
+    b.setAttribute("aria-pressed", String(f.levels.has(key)));
+  });
   document.querySelectorAll("#f-family .chip").forEach((b) => {
     b.setAttribute("aria-pressed", String(f.families.has(label(b))));
   });
@@ -607,7 +631,7 @@ function renderKpis() {
       note: ((totalFte / allFte) * 100).toFixed(1) + "% of national FTE",
       tone: "flat",
     },
-    metricCard("Median grad rate", "gradRate"),
+    gradCard(),
     metricCard("Median S:F ratio", "sfr", true),
     metricCard("Median Pell share", "pellPct"),
   ];
@@ -628,6 +652,56 @@ function renderKpis() {
       "</span>";
     box.append(el);
   });
+}
+
+/**
+ * Graduation-rate KPI. Four-year (six-year clock) and two-year (three-year
+ * clock) rates are different measures, so a single-level view is benchmarked
+ * against that level's national median, and a mixed view reports each level.
+ */
+function gradCard() {
+  const label = "Median grad rate";
+  const pct = METRICS.gradRate.fmt;
+  const byLevel = (rows, key) =>
+    rows.filter((d) => d.level === key).map((d) => d.gradRate);
+  const present = LEVELS.filter((l) =>
+    state.view.some((d) => d.level === l.key && d.gradRate != null),
+  );
+
+  if (present.length !== 1) {
+    const card = metricCard(label, "gradRate");
+    if (present.length === 2) {
+      card.note = present
+        .map((l) => l.short + " " + pct(median(byLevel(state.view, l.key))))
+        .join(" · ");
+      card.note += " · mixed levels";
+      card.tone = "flat";
+    }
+    return card;
+  }
+
+  const lvl = present[0];
+  const viewMed = median(byLevel(state.view, lvl.key));
+  const natMed = median(byLevel(state.all, lvl.key));
+  const n = state.view.filter((d) => d.gradRate != null).length;
+  const diff = viewMed - natMed;
+  const rel = natMed ? diff / natMed : 0;
+  const flat = Math.abs(rel) < 0.01;
+  return {
+    label,
+    value: pct(viewMed),
+    note:
+      (flat
+        ? "at"
+        : (diff > 0 ? "▲ " : "▼ ") + Math.abs(rel * 100).toFixed(0) + "% vs") +
+      " national " +
+      lvl.short +
+      " " +
+      pct(natMed) +
+      " · n=" +
+      n.toLocaleString("en-US"),
+    tone: flat ? "flat" : diff > 0 ? "up" : "down",
+  };
 }
 
 /** KPI card comparing the filtered median against the national median. */
@@ -1460,14 +1534,20 @@ function peerGroup(target, k = 8) {
 
   const tiers = [
     {
-      test: (d) => d.control === target.control && d.family === target.family,
-      label: "same control and Carnegie family",
+      test: (d) =>
+        d.control === target.control &&
+        d.level === target.level &&
+        d.family === target.family,
+      label: "same control, level and Carnegie family",
     },
     {
       test: (d) => d.control === target.control && d.level === target.level,
       label: "same control and level",
     },
-    { test: (d) => d.control === target.control, label: "same control" },
+    {
+      test: (d) => d.level === target.level,
+      label: "same level",
+    },
   ];
 
   let pool = [];

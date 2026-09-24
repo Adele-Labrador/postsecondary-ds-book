@@ -41,11 +41,13 @@ LEVEL_LABELS = {
     4: "4-year or above",
 }
 
-# Carnegie Basic Classification, 2021 edition (`cc_basic_2021` in the portal's
-# directory endpoint). The 33 codes below follow the official published order,
-# spot-verified against known institutions: code 15 returns Harvard, Stanford,
-# MIT, Yale and Columbia (Very High Research); code 18 returns Alabama A&M
-# (Master's, Larger Programs); code 16 returns Villanova (High Research).
+# Carnegie Basic Classification, 2021 edition (`C21BASIC` in the NCES HD file,
+# `cc_basic_2021` in the Urban portal). Labels follow the Urban IPEDS directory
+# codebook. 2021 added "Special Focus Four-Year: Research Institutions" as code
+# 27, shifting the later special-focus codes and moving Tribal Colleges to 33.
+# tests/test_carnegie_codes.py pins each four-year special-focus and tribal code
+# to institutions that are unambiguous members (e.g. 30 = Juilliard, 31 =
+# Brooklyn Law School, 33 = Navajo Technical University).
 # Each entry is (full published label, coarse family used for filtering).
 A = "Associate's"
 SF = "Special Focus"
@@ -80,13 +82,13 @@ CC_BASIC_2021 = {
     24: ("Special Focus Four-Year: Faith-Related Institutions", SF),
     25: ("Special Focus Four-Year: Medical Schools & Centers", SF),
     26: ("Special Focus Four-Year: Other Health Professions Schools", SF),
-    27: ("Special Focus Four-Year: Engineering and Other Technology-Related Schools", SF),
-    28: ("Special Focus Four-Year: Business & Management Schools", SF),
-    29: ("Special Focus Four-Year: Arts, Music & Design Schools", SF),
-    30: ("Special Focus Four-Year: Law Schools", SF),
-    31: ("Special Focus Four-Year: Other Special Focus Institutions", SF),
-    32: ("Tribal Colleges", "Tribal"),
-    33: ("Not classified", None),
+    27: ("Special Focus Four-Year: Research Institutions", SF),
+    28: ("Special Focus Four-Year: Engineering and Other Technology-Related Schools", SF),
+    29: ("Special Focus Four-Year: Business & Management Schools", SF),
+    30: ("Special Focus Four-Year: Arts, Music & Design Schools", SF),
+    31: ("Special Focus Four-Year: Law Schools", SF),
+    32: ("Special Focus Four-Year: Other Special Focus Institutions", SF),
+    33: ("Tribal Colleges and Universities", "Tribal"),
 }
 
 

@@ -59,10 +59,17 @@ one of these causes:
   revised files after the portal loaded the original release.
 - **Two-year graduation rates.** The portal query returned only 4-year cohort
   rows, so 1,196 two-year colleges had no graduation rate. They now do.
-- **Portal errors corrected.** Penn State–Main Campus had no Carnegie class
-  (NCES: R1), College of the Atlantic was tagged as a Tribal College (NCES:
+- **Portal differences.** Penn State–Main Campus had no Carnegie class in the
+  portal (NCES: R1), College of the Atlantic carried a different code (NCES:
   Baccalaureate, Arts & Sciences), and two institutions' reported $0 tuition was
   dropped as missing.
+
+The Carnegie labels for codes 27–33 were later found to be off by one (the 2021
+edition added a Special Focus Research Institutions category). That affected
+both builds equally, so the comparison above did not catch it. It is fixed and
+covered by `tests/test_carnegie_codes.py`. Before the fix, the dashboard's
+Tribal filter listed "Other Special Focus" institutions, and the 35 tribal
+colleges showed as unclassified.
 
 ## Running locally
 

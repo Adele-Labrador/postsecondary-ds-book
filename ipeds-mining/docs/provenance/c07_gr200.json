@@ -1,0 +1,14 @@
+[
+  {
+    "data_bytes": 101013,
+    "data_path": "../data/raw/GR200_23.zip",
+    "data_sha256": "56c2eee675f7201e3c87314ad1bb5b20348cb766e35fa108180aef6edf7c4d12",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/GR200_23.zip",
+    "dict_bytes": 17431,
+    "dict_path": "../data/raw/GR200_23_Dict.zip",
+    "dict_sha256": "60597e0749f0c8f80e8856657bbebf566c2869bbfa86131c4208737f001f5cd8",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/GR200_23_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:26+00:00",
+    "table": "GR200_23"
+  }
+]

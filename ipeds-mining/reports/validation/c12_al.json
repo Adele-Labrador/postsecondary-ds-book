@@ -1,0 +1,52 @@
+{
+  "table": "c12_al",
+  "rows": 3695,
+  "results": [
+    {
+      "name": "unique_key(UNITID)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Declared grain must be unique",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(LEXPTOT,0,None)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "sums_to(LEXPTOT)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Parts must reconcile within 1",
+      "status": "pass"
+    },
+    {
+      "name": "sums_to(LEXMSTL)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Parts must reconcile within 1",
+      "status": "pass"
+    },
+    {
+      "name": "sums_to(LEXOMTL)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Parts must reconcile within 1",
+      "status": "pass"
+    }
+  ],
+  "generated_utc": "2026-09-24T17:19:39+00:00"
+}

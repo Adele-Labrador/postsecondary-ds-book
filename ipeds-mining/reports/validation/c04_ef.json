@@ -1,0 +1,25 @@
+{
+  "table": "c04_ef",
+  "rows": 115156,
+  "results": [
+    {
+      "name": "unique_key(UNITID,EFALEVEL)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Declared grain must be unique",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(EFTOTLT,0,None)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    }
+  ],
+  "generated_utc": "2026-09-24T17:19:17+00:00"
+}

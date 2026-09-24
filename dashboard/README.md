@@ -1,5 +1,8 @@
 # IPEDS Explorer — interactive dashboard
 
+Live at <https://adele-labrador.github.io/postsecondary-ds-book/>, redeployed
+by `.github/workflows/pages.yml` on every push that touches `dashboard/`.
+
 A static, dependency-light dashboard built on the same IPEDS panel the book's
 modules produce. It is the visual companion to `src/` : the peer-group logic
 mirrors `src/features/peer_groups.py`, and the FTE forecast mirrors the

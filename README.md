@@ -3,6 +3,9 @@
 [![CI](https://github.com/Adele-Labrador/postsecondary-ds-book/actions/workflows/ci.yml/badge.svg)](https://github.com/Adele-Labrador/postsecondary-ds-book/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+[![Dashboard](https://github.com/Adele-Labrador/postsecondary-ds-book/actions/workflows/pages.yml/badge.svg)](https://adele-labrador.github.io/postsecondary-ds-book/)
+
+**Live dashboard:** [IPEDS Explorer](https://adele-labrador.github.io/postsecondary-ds-book/), an interactive view of 3,689 institutions built from IPEDS 2023 data (source in [`dashboard/`](dashboard/)).
 
 Reproducible starter code for the book *Data Science for Postsecondary Education
 Metrics*. This repo turns public [IPEDS](https://nces.ed.gov/ipeds/) survey

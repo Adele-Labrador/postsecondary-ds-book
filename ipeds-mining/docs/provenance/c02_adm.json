@@ -1,0 +1,14 @@
+[
+  {
+    "data_bytes": 97321,
+    "data_path": "../data/raw/ADM2023.zip",
+    "data_sha256": "670ecc7c4313f044dcdf740a42ef10c6d2927eb9f890fb405e3569c8442aca27",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/ADM2023.zip",
+    "dict_bytes": 28244,
+    "dict_path": "../data/raw/ADM2023_Dict.zip",
+    "dict_sha256": "d80bf7c781e39f7cbcb02f10f4d17b0c2c0e16786ea686217d12344c6167803d",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/ADM2023_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:11+00:00",
+    "table": "ADM2023"
+  }
+]

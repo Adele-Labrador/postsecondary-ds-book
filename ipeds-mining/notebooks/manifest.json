@@ -1,0 +1,356 @@
+[
+ {
+  "slug": "c01_ic",
+  "title": "Institutional Characteristics and the Directory Universe",
+  "tables": [
+   "HD2023",
+   "IC2023",
+   "IC2023_AY",
+   "DRVIC2023"
+  ],
+  "reference_period": "2023-24 institutional universe; AY 2023-24 published charges",
+  "grain": [
+   "UNITID"
+  ],
+  "cells": 24,
+  "path": "notebooks/c01_ic.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c02_adm",
+  "title": "Admissions and Test Scores",
+  "tables": [
+   "ADM2023"
+  ],
+  "reference_period": "Fall 2023 cohort of first-time degree-seeking undergraduates",
+  "grain": [
+   "UNITID"
+  ],
+  "cells": 24,
+  "path": "notebooks/c02_adm.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c03_e12",
+  "title": "Twelve-Month Enrollment and Instructional Activity",
+  "tables": [
+   "EFFY2023",
+   "EFIA2023",
+   "DRVEF122023"
+  ],
+  "reference_period": "July 1, 2022 through June 30, 2023",
+  "grain": [
+   "UNITID",
+   "EFFYALEV"
+  ],
+  "cells": 24,
+  "path": "notebooks/c03_e12.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c04_ef",
+  "title": "Fall Enrollment, Retention, and Student-to-Faculty Ratio",
+  "tables": [
+   "EF2023A",
+   "EF2023B",
+   "EF2023C",
+   "EF2023D",
+   "DRVEF2023"
+  ],
+  "reference_period": "Fall 2023 census date",
+  "grain": [
+   "UNITID",
+   "EFALEVEL"
+  ],
+  "cells": 24,
+  "path": "notebooks/c04_ef.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c05_c",
+  "title": "Completions by Program, Level, and Demographic Group",
+  "tables": [
+   "C2023_A",
+   "C2023_B",
+   "C2023_C",
+   "DRVC2023"
+  ],
+  "reference_period": "Awards conferred July 1, 2022 through June 30, 2023",
+  "grain": [
+   "UNITID",
+   "CIPCODE",
+   "AWLEVEL",
+   "MAJORNUM"
+  ],
+  "cells": 24,
+  "path": "notebooks/c05_c.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c06_gr",
+  "title": "Graduation Rates at 150 Percent of Normal Time",
+  "tables": [
+   "GR2023",
+   "DRVGR2023"
+  ],
+  "reference_period": "Status as of August 31, 2023 for the 2017 entering cohort at 4-year institutions and the 2020 entering cohort at 2-year institutions",
+  "grain": [
+   "UNITID",
+   "GRTYPE"
+  ],
+  "cells": 24,
+  "path": "notebooks/c06_gr.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c07_gr200",
+  "title": "Graduation Rates at 200 Percent of Normal Time",
+  "tables": [
+   "GR200_23"
+  ],
+  "reference_period": "Status as of August 31, 2023 for the 2015 entering cohort at 4-year institutions and the 2019 entering cohort at less-than-4-year institutions",
+  "grain": [
+   "UNITID"
+  ],
+  "cells": 24,
+  "path": "notebooks/c07_gr200.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c08_om",
+  "title": "Outcome Measures for Non-Traditional Cohorts",
+  "tables": [
+   "OM2023",
+   "DRVOM2023"
+  ],
+  "reference_period": "2015-16 entering cohort observed at 4, 6, and 8 years (August 31 2019, 2021, and 2023)",
+  "grain": [
+   "UNITID",
+   "OMCHRT"
+  ],
+  "cells": 24,
+  "path": "notebooks/c08_om.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c09_sfa",
+  "title": "Student Financial Aid and Net Price",
+  "tables": [
+   "SFA2223",
+   "SFAV2223"
+  ],
+  "reference_period": "2022-23 aid year",
+  "grain": [
+   "UNITID"
+  ],
+  "cells": 24,
+  "path": "notebooks/c09_sfa.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c10_f",
+  "title": "Finance Under Three Accounting Standards",
+  "tables": [
+   "F2223_F1A",
+   "F2223_F2",
+   "F2223_F3",
+   "DRVF2023"
+  ],
+  "reference_period": "Fiscal year 2023",
+  "grain": [
+   "UNITID"
+  ],
+  "cells": 24,
+  "path": "notebooks/c10_f.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c11_hr",
+  "title": "Human Resources, Staffing Mix, and Tenure",
+  "tables": [
+   "S2023_OC",
+   "S2023_IS",
+   "S2023_SIS",
+   "S2023_NH",
+   "SAL2023_IS",
+   "DRVHR2023"
+  ],
+  "reference_period": "Payroll snapshot of November 1, 2023; salary outlays for AY 2023-24",
+  "grain": [
+   "UNITID",
+   "STAFFCAT"
+  ],
+  "cells": 24,
+  "path": "notebooks/c11_hr.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "c12_al",
+  "title": "Academic Libraries",
+  "tables": [
+   "AL2023",
+   "DRVAL2023"
+  ],
+  "reference_period": "Fiscal year 2023",
+  "grain": [
+   "UNITID"
+  ],
+  "cells": 24,
+  "path": "notebooks/c12_al.ipynb",
+  "kind": "component"
+ },
+ {
+  "slug": "01_ingest_clean_deidentify",
+  "title": "Ingest, Clean, and De-identify",
+  "kind": "analysis",
+  "guidebook": "ch. 3",
+  "summary": "institutions_2023.parquet; public layer; analytic dictionary",
+  "reads": [
+   "data/curated/*"
+  ],
+  "writes": [
+   "institutions_2023.parquet",
+   "institutions_2023_public.parquet"
+  ],
+  "cells": 27,
+  "code_cells": 13,
+  "path": "notebooks/01_ingest_clean_deidentify.ipynb"
+ },
+ {
+  "slug": "02_distributions_and_missingness",
+  "title": "Distributions and Missingness",
+  "kind": "analysis",
+  "guidebook": "ch. 4",
+  "summary": "transforms, robust outliers, count models",
+  "reads": [
+   "institutions_2023.parquet"
+  ],
+  "writes": [],
+  "cells": 24,
+  "code_cells": 13,
+  "path": "notebooks/02_distributions_and_missingness.ipynb"
+ },
+ {
+  "slug": "03_classical_inference",
+  "title": "Classical Inference",
+  "kind": "analysis",
+  "guidebook": "ch. 5",
+  "summary": "effect sizes, permutation test, ecological weighting",
+  "reads": [
+   "institutions_2023.parquet"
+  ],
+  "writes": [],
+  "cells": 17,
+  "code_cells": 9,
+  "path": "notebooks/03_classical_inference.ipynb"
+ },
+ {
+  "slug": "04_bayesian_shrinkage",
+  "title": "Bayesian Shrinkage of Graduation Rates",
+  "kind": "analysis",
+  "guidebook": "ch. 6",
+  "summary": "beta-binomial shrinkage with out-of-cohort validation",
+  "reads": [
+   "institutions_2023.parquet"
+  ],
+  "writes": [
+   "shrunk_grad_rates.parquet"
+  ],
+  "cells": 19,
+  "code_cells": 11,
+  "path": "notebooks/04_bayesian_shrinkage.ipynb"
+ },
+ {
+  "slug": "05_clustering_peer_groups",
+  "title": "Clustering Peer Groups",
+  "kind": "analysis",
+  "guidebook": "ch. 7",
+  "summary": "k-means/GMM peer groups, stability, external validation",
+  "reads": [
+   "institutions_2023.parquet"
+  ],
+  "writes": [
+   "peer_groups.parquet"
+  ],
+  "cells": 22,
+  "code_cells": 13,
+  "path": "notebooks/05_clustering_peer_groups.ipynb"
+ },
+ {
+  "slug": "06_pca_institutional_landscape",
+  "title": "Dimensionality Reduction",
+  "kind": "analysis",
+  "guidebook": "ch. 8",
+  "summary": "PCA with parallel analysis and bootstrap loadings",
+  "reads": [
+   "institutions_2023.parquet",
+   "peer_groups.parquet (optional)"
+  ],
+  "writes": [],
+  "cells": 16,
+  "code_cells": 9,
+  "path": "notebooks/06_pca_institutional_landscape.ipynb"
+ },
+ {
+  "slug": "07_regression_enrollment_finance",
+  "title": "Regression: Tuition Revenue",
+  "kind": "analysis",
+  "guidebook": "ch. 9",
+  "summary": "OLS HC3, CV model comparison, test-optional missingness",
+  "reads": [
+   "institutions_2023.parquet"
+  ],
+  "writes": [],
+  "cells": 18,
+  "code_cells": 10,
+  "path": "notebooks/07_regression_enrollment_finance.ipynb"
+ },
+ {
+  "slug": "08_classification_completion_risk",
+  "title": "Classification: Institutional Completion",
+  "kind": "analysis",
+  "guidebook": "ch. 10",
+  "summary": "institution-level classification, calibration, subgroup audit",
+  "reads": [
+   "institutions_2023.parquet"
+  ],
+  "writes": [],
+  "cells": 18,
+  "code_cells": 9,
+  "path": "notebooks/08_classification_completion_risk.ipynb"
+ },
+ {
+  "slug": "09_longitudinal_panel_models",
+  "title": "Longitudinal Trends in Retention",
+  "kind": "analysis",
+  "guidebook": "ch. 11",
+  "summary": "vintage stacking, balanced panels, event study",
+  "reads": [
+   "institutions_2023.parquet",
+   "EF2018D-EF2023D",
+   "IC2023_AY"
+  ],
+  "writes": [],
+  "cells": 14,
+  "code_cells": 8,
+  "path": "notebooks/09_longitudinal_panel_models.ipynb"
+ },
+ {
+  "slug": "10_benchmarking_scorecards",
+  "title": "Institutional Benchmarking",
+  "kind": "analysis",
+  "guidebook": "ch. 12",
+  "summary": "within-peer scorecard with weight-sensitivity rank intervals",
+  "reads": [
+   "institutions_2023.parquet",
+   "peer_groups.parquet",
+   "shrunk_grad_rates.parquet (optional)"
+  ],
+  "writes": [
+   "scorecard_126562.csv"
+  ],
+  "cells": 17,
+  "code_cells": 10,
+  "path": "notebooks/10_benchmarking_scorecards.ipynb"
+ }
+]

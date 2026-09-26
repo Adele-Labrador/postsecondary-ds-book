@@ -1,0 +1,62 @@
+[
+  {
+    "data_bytes": 2979525,
+    "data_path": "../data/raw/EF2023A.zip",
+    "data_sha256": "d1fbd91cbda965e6bf75b9167825ec121d9ebf218ef7bc164276ef0443290237",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023A.zip",
+    "dict_bytes": 26056,
+    "dict_path": "../data/raw/EF2023A_Dict.zip",
+    "dict_sha256": "bf3c489ba9d112243ceac85f51db0eff32dc1bebed725abfcb0b3bdd177dea6c",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023A_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:16+00:00",
+    "table": "EF2023A"
+  },
+  {
+    "data_bytes": 1741540,
+    "data_path": "../data/raw/EF2023B.zip",
+    "data_sha256": "1aa81bcff050d82920c2d4ab921b91c763e2f9ff77adc45b2f0978bb6270b9cc",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023B.zip",
+    "dict_bytes": 17689,
+    "dict_path": "../data/raw/EF2023B_Dict.zip",
+    "dict_sha256": "87230040feaef0f49aaf2178438cf5d2e76b464c48458b37f1aec3317e57341c",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023B_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:16+00:00",
+    "table": "EF2023B"
+  },
+  {
+    "data_bytes": 181241,
+    "data_path": "../data/raw/EF2023C.zip",
+    "data_sha256": "add4ece19bb4f8a5b7a893f60c9f96411beed137ec62a48e21be949253a332ee",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023C.zip",
+    "dict_bytes": 20211,
+    "dict_path": "../data/raw/EF2023C_Dict.zip",
+    "dict_sha256": "33ff3bef613e7b434d9fea1626b7f22cbf8fa61816964311407d365777b7e22e",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023C_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:16+00:00",
+    "table": "EF2023C"
+  },
+  {
+    "data_bytes": 94562,
+    "data_path": "../data/raw/EF2023D.zip",
+    "data_sha256": "cfe4267b5b2e2a2ce6ea8c079c64707868c8c5b22372d578959e1726969e0c8c",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023D.zip",
+    "dict_bytes": 19121,
+    "dict_path": "../data/raw/EF2023D_Dict.zip",
+    "dict_sha256": "5f8d9b6c785a149e32d4af0fd22f1f4350a12919e30d0de30652d8a5ed58338e",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/EF2023D_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:16+00:00",
+    "table": "EF2023D"
+  },
+  {
+    "data_bytes": 415320,
+    "data_path": "../data/raw/DRVEF2023.zip",
+    "data_sha256": "8d38adec5a7febeaa0060310534e1871d09621fe3620f0adec11f33bf6720b40",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/DRVEF2023.zip",
+    "dict_bytes": 31719,
+    "dict_path": "../data/raw/DRVEF2023_Dict.zip",
+    "dict_sha256": "ef33194569c425e99747cf2a97329f6d7f21793210242daaf2fd67cb8109710c",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/DRVEF2023_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:16+00:00",
+    "table": "DRVEF2023"
+  }
+]

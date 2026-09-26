@@ -1,0 +1,45 @@
+{
+  "table": "c10_f",
+  "rows": 5772,
+  "results": [
+    {
+      "name": "unique_key(UNITID)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Declared grain must be unique",
+      "status": "pass"
+    },
+    {
+      "name": "not_null(REPORTING_STANDARD)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Key columns must be populated",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(TOTAL_REVENUES,0,None)",
+      "severity": "warn",
+      "n_offending": 1,
+      "share": 0.00017,
+      "sample_unitids": [
+        "120166"
+      ],
+      "note": "Value plausibility bound",
+      "status": "fail"
+    },
+    {
+      "name": "in_range(TOTAL_EXPENSES,0,None)",
+      "severity": "warn",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    }
+  ],
+  "generated_utc": "2026-09-24T17:19:33+00:00"
+}

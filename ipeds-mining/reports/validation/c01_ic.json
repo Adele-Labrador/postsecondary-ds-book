@@ -1,0 +1,43 @@
+{
+  "table": "c01_ic",
+  "rows": 6163,
+  "results": [
+    {
+      "name": "unique_key(UNITID)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Declared grain must be unique",
+      "status": "pass"
+    },
+    {
+      "name": "not_null(UNITID,INSTNM)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Key columns must be populated",
+      "status": "pass"
+    },
+    {
+      "name": "subset_of(CONTROL)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Codes must match published value set",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(SECTOR,0,99)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    }
+  ],
+  "generated_utc": "2026-09-24T17:19:10+00:00"
+}

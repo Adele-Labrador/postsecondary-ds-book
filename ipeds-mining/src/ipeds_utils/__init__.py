@@ -9,6 +9,7 @@ fixed once rather than twelve times.
     )
 """
 
+from . import funding
 from .deidentify import coarsen, k_anonymity, suppress, synthetic_id
 from .dictionary import (
     assert_reference_period,
@@ -72,9 +73,10 @@ from .validate import (
     validate,
 )
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
+    "funding",
     "DATA_URL",
     "DICT_URL",
     "FetchError",

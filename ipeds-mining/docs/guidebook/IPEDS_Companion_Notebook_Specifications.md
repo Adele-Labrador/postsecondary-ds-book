@@ -492,9 +492,9 @@ One Parquet table per component with a metadata sidecar carrying reference perio
 
 All twelve components validate clean except one deliberate warning: a single institution reports negative total revenues in `c10_f`, which is plausible after a year of investment losses, so the value is preserved rather than masked.
 
-### 3.5 The ten analysis notebooks
+### 3.5 The eleven analysis notebooks
 
-The analysis notebooks are generated from one module of cells each (`tools/analysis_cells/nb01.py` to `nb10.py`) by `tools/build_analysis_notebooks.py`, which parses every code cell before writing. All ten run end to end on the 2023-24 data in under 70 seconds in total. Every interpretive sentence in them was checked against the executed output, and six were rewritten because the numbers contradicted the first draft.
+The analysis notebooks are generated from one module of cells each (`tools/analysis_cells/nb01.py` to `nb11.py`) by `tools/build_analysis_notebooks.py`, which parses every code cell before writing. The first ten run end to end on the 2023-24 data in under 70 seconds in total; notebook 11, a Colorado capstone that fetches seven years of its own files, runs in about 20 seconds once they are cached. Every interpretive sentence in them was checked against the executed output, and six were rewritten because the numbers contradicted the first draft.
 
 | Notebook | Methods | Result on the 2023-24 data |
 |---|---|---|
@@ -508,6 +508,7 @@ The analysis notebooks are generated from one module of cells each (`tools/analy
 | `08_classification_completion_risk` | Within-sector target, logistic and boosting, calibration, Pell-tercile error audit, ablation | Institution-level only. AUC 0.76 logistic, 0.81 boosting. Dropping the grant features lowers AUC to 0.77, leaves the high-Pell false-negative rate near 50%, and miscalibrates that group (0.44 predicted vs 0.35 observed) |
 | `09_longitudinal_panel_models` | Six-vintage stacking with period assertions, balanced vs unbalanced, two-way FE event study, clustered SEs | Fall-2020 cohort: -2.0 points at public 4-years, recovered by fall 2022. Public 2-years dip a year earlier and end 2.1 points above baseline. Nonprofits are flat. For-profit 4-years are down about 5 points with wide intervals |
 | `10_benchmarking_scorecards` | Within-peer robust z, winsorising, a 4-of-6 coverage rule, 500 Dirichlet weightings, a focal scorecard | The median 90% rank interval spans 100 of 207 places. The CU Denver/Anschutz scorecard shows how a resource-based peer model pairs a medical campus with residential flagships |
+| `11_colorado_performance_funding` | HB 20-1366 Step 2 reconstruction from IPEDS + CDHE FTE, period assertions on four surveys, consistent-reporter windows, out-of-sample validation against appropriations, window and proxy sensitivity, uniform-increase counterfactual, retention perturbation, disaggregated completion gaps with intervals | Correlation 0.83 with actual FY 2025-26 board increases, 0.00 with windows shifted a year. Performance moved $1.11M of $1.246B (0.089%). A retention point is worth about $154,000 a year to CU. The CCCS IPEDS retention cohort fell from 5,384 to 1,207 through reclassification. Arithmetic matches CDHE's worked example ([data definitions](https://cdhe.colorado.gov/sites/highered/files/Colorado_Performance_Funding_Overview_and_Data_Definitions_2025_26_1.pdf)) |
 
 ### 3.6 Further corrections from the analysis layer
 

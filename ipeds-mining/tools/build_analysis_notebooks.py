@@ -22,7 +22,7 @@ import nbformat
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-MODULES = [f"nb{i:02d}" for i in range(1, 11)]
+MODULES = [f"nb{i:02d}" for i in range(1, 12)]
 
 
 def cells_for(module_name: str):

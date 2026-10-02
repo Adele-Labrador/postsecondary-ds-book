@@ -368,3 +368,64 @@ def test_suppress_counts_single_cell_groups_it_cannot_protect():
     out, audit = iu.suppress(frame, ["N"], threshold=5, group_cols=["G"])
     assert out["N"].isna().tolist() == [True, True, True]
     assert audit.loc[0, "groups_needing_total_suppressed"] == 1
+
+
+# --- HB 20-1366 funding mechanics ----------------------------------------------
+
+
+def test_metric_allocation_reproduces_cdhe_table_2():
+    # Worked example in CDHE's Performance Funding Overview and Data Definitions.
+    prior = pd.Series([0.10, 0.20, 0.70], index=["X", "Y", "Z"])
+    d = pd.Series([105 / 100, 550 / 500, 910 / 900], index=prior.index)
+    alloc = iu.funding.metric_allocation(prior, d)
+    assert (alloc * 100).round(1).tolist() == [10.2, 21.3, 68.5]
+
+
+def test_d_ratio_identity_and_gaps():
+    x = [100.0, 104.0, 98.0, 110.0]
+    assert np.isclose(iu.funding.d_ratio(x), 0.75 + 0.25 * x[3] / np.mean(x[:3]))
+    assert np.isnan(iu.funding.d_ratio([1.0, 2.0, np.nan, 3.0]))
+    assert np.isnan(iu.funding.d_ratio([1.0, 2.0, 3.0]))
+
+
+def test_step2_neutral_metrics_leave_shares_unchanged():
+    prior = pd.Series([3.0, 1.0], index=["A", "B"])
+    d = pd.DataFrame({"retention": [1.02, 1.02]}, index=prior.index)
+    shares = iu.funding.step2_shares(prior, d)
+    assert np.allclose(shares, [0.75, 0.25])
+    assert np.isclose(shares.sum(), 1.0)
+
+
+def test_step2_refuses_partial_metric():
+    prior = pd.Series([0.5, 0.5], index=["A", "B"])
+    d = pd.DataFrame({"retention": [1.01, np.nan]}, index=prior.index)
+    with pytest.raises(ValueError):
+        iu.funding.step2_shares(prior, d)
+
+
+def test_formula_window_matches_cdhe_fy2024_25_years():
+    # CDHE: fall 2019-2022 for FY 2024-25; FY 2025-26 graduation cohorts start fall 2017.
+    assert iu.funding.formula_window(2024, "retention") == [2019, 2020, 2021, 2022]
+    assert iu.funding.formula_window(2025, "grad150")[-1] == 2023  # GR2023: 2017 4-yr cohort
+    assert iu.funding.formula_window(2025, "credentials") == [2021, 2022, 2023, 2024]
+    assert iu.funding.fiscal_year_label(2025) == "FY 2025-26"
+
+
+def test_consistent_reporters_drops_definition_changes_and_zero_cohorts():
+    panel = pd.DataFrame(
+        {
+            "UNITID": [1] * 4 + [2] * 4 + [3] * 4,
+            "year": [2020, 2021, 2022, 2023] * 3,
+            "num": [5, 5, 5, 5, 5, 5, 0, 0, 5, 5, 5, 5],
+            "den": [9, 9, 9, 9, 9, 9, 0, 0, 9, 9, 9, 9],
+            "src": ["2yr"] * 4 + ["2yr"] * 4 + ["2yr", "2yr", "4yr", "4yr"],
+        }
+    )
+    assert iu.funding.consistent_reporters(panel, [2020, 2021, 2022, 2023]).tolist() == [1]
+
+
+def test_redistribution_sums_to_zero():
+    base = pd.Series([100.0, 300.0], index=["A", "B"])
+    out = iu.funding.redistribution(base, pd.Series([103.0, 307.0], index=base.index))
+    assert np.isclose(out["moved"].sum(), 0.0)
+    assert np.isclose(out.loc["A", "moved"], 103.0 - 102.5)

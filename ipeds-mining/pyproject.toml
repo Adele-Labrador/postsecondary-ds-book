@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ipeds-utils"
-version = "1.1.0"
+version = "1.2.0"
 description = "Shared utilities for the Mining IPEDS Data guidebook"
 requires-python = ">=3.10"
 dependencies = [

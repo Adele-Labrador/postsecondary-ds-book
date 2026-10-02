@@ -1,8 +1,8 @@
 # Mining IPEDS Data — Executable Starter Code
 
-Working code for the companion notebook specifications (version 1.1.0; the guidebook framework and the specifications themselves are in `docs/guidebook/`): a shared utility
-package, twelve component curation notebooks, ten analysis notebooks that follow the
-guidebook chapters, and a test suite. Every notebook in this repository has been executed
+Working code for the companion notebook specifications (version 1.2.0; the guidebook framework and the specifications themselves are in `docs/guidebook/`): a shared utility
+package, twelve component curation notebooks, eleven analysis notebooks that follow the
+guidebook chapters (the eleventh is a Colorado performance-funding capstone), and a test suite. Every notebook in this repository has been executed
 end to end against the live IPEDS Data Center, and every variable name has been verified
 against the official published dictionaries.
 
@@ -55,10 +55,10 @@ src/ipeds_utils/     shared package — the only place parsing quirks are handle
   io.py              curated Parquet output with metadata sidecars
   features.py        analytic institution table, vintage stacking, peer features
   stats.py           robust z, Cliff's delta, beta-binomial shrinkage, FE transform
-notebooks/           c01..c12 component notebooks, 01..10 analysis notebooks, manifest.json
+notebooks/           c01..c12 component notebooks, 01..11 analysis notebooks, manifest.json
 tools/
   build_notebooks.py           regenerates the twelve component notebooks
-  build_analysis_notebooks.py  regenerates the ten analysis notebooks
+  build_analysis_notebooks.py  regenerates the eleven analysis notebooks
   analysis_cells/              one module of cells per analysis notebook (nb01..nb10)
 tests/               44 tests (offline + network-marked)
 data/
@@ -124,6 +124,12 @@ writing, so a syntax error fails the build rather than the reader.
 | `08_classification_completion_risk` | Ch. 10 | Which institutions complete above their sector median? | Institution-level only. Boosting AUC 0.81. Dropping the Pell features does not fix subgroup errors |
 | `09_longitudinal_panel_models` | Ch. 11 | Did pandemic-era cohorts retain worse? | Public 4-year dip of 2 points for the fall-2020 cohort, recovered by fall 2022. Public 2-year above pre-pandemic by fall 2022 |
 | `10_benchmarking_scorecards` | Ch. 12 | Where does a focal institution stand among peers? | Median 90% rank interval under random weights spans 100 of 207 places |
+| `11_colorado_performance_funding` | Ch. 13 | Can Colorado's HB 20-1366 Step 2 allocation be rebuilt from public data, and what does it reward? | Reconstruction correlates 0.83 with actual FY 2025-26 board increases (0 with windows shifted a year). Performance moved $1.11M of $1.25B (0.09%) against a uniform 2.5% |
+
+Notebook 11 is self-contained: it reads `../../dashboard/data/colorado.json` from the parent
+repository (or downloads it from GitHub) and fetches its own IPEDS files, so it does not
+depend on 01-10. Its arithmetic lives in `ipeds_utils.funding` and is tested against the
+worked example in CDHE's [performance funding data definitions](https://cdhe.colorado.gov/sites/highered/files/Colorado_Performance_Funding_Overview_and_Data_Definitions_2025_26_1.pdf).
 
 ## The three gotchas the package exists to absorb
 
@@ -181,6 +187,18 @@ Each of these produced plausible-looking wrong numbers until a check caught it.
   2-year level. Weight and size retention by `RRFTCTA`.
 - **Retention timing.** `RET_PCF` in the fall `t` release describes the cohort that entered
   in fall `t - 1`. `DRVGR` and `DRVEF12` exist under those names only from 2021.
+- **IPEDS reclassification erases community-college cohorts.** When a CCCS college begins
+  awarding bachelor's degrees, IPEDS treats it as four-year: its retention cohort becomes
+  bachelor's seekers only, and the bachelor's GR subcohort replaces the two-year cohort.
+  The CCCS full-time retention cohort in IPEDS fell from 5,384 (fall 2016 entrants) to 1,207
+  (fall 2022). Front Range went from 1,099 to 0. `iu.funding.consistent_reporters` keeps an
+  institution only if it reports under one definition, with a positive cohort, in every
+  window year.
+- **GR mixes two cohorts in one file.** `GR2023` describes 2017 entrants at four-year
+  institutions and 2020 entrants at two-year institutions. A college that changes level
+  mid-panel therefore jumps three cohort years. Assert the cohort year from the dictionary
+  (`cohort year 2017 \(4-year\)`). `assert_reference_period` takes a regular expression, so
+  parentheses must be escaped.
 
 ## Design decisions worth knowing
 

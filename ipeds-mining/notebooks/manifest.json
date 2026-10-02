@@ -352,5 +352,24 @@
   "cells": 17,
   "code_cells": 10,
   "path": "notebooks/10_benchmarking_scorecards.ipynb"
+ },
+ {
+  "slug": "11_colorado_performance_funding",
+  "title": "Colorado Performance Funding (HB 20-1366)",
+  "kind": "analysis",
+  "guidebook": "ch. 13",
+  "summary": "rebuilds the HB 20-1366 Step 2 board allocation from IPEDS and CDHE FTE, validates it against FY 2025-26 appropriations, and examines what the formula rewards",
+  "reads": [
+   "../../dashboard/data/colorado.json",
+   "EF{y}D, EF{y}A, GR{y} 2017-2023",
+   "SFA1617-SFA2223",
+   "C2018_A-C2024_A"
+  ],
+  "writes": [
+   "reports/funding/fy2025_26_reconstruction.csv"
+  ],
+  "cells": 28,
+  "code_cells": 15,
+  "path": "notebooks/11_colorado_performance_funding.ipynb"
  }
 ]

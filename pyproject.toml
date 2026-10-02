@@ -21,6 +21,8 @@ dev = [
     "ruff>=0.6",
     "black>=24.0",
 ]
+# Only needed to rebuild dashboard/data/colorado.json from the state PDFs.
+colorado = ["pdfplumber>=0.11"]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

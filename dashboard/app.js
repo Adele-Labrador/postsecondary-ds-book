@@ -39,6 +39,8 @@ function paintThemeButton() {
     "aria-label",
     "Switch to " + (theme === "dark" ? "light" : "dark") + " mode",
   );
+  const co = document.getElementById("co-link");
+  if (co) co.href = "colorado.html#theme=" + theme;
 }
 
 document.documentElement.setAttribute("data-theme", theme);
@@ -147,6 +149,24 @@ const METRICS = {
     fmt: fmt.usd,
     axis: fmt.usdK,
   },
+  earnings4yr: {
+    label: "Median earnings, 4 yrs after completion",
+    short: "Earnings",
+    fmt: fmt.usd,
+    axis: fmt.usdK,
+  },
+  earnings10yr: {
+    label: "Median earnings, 10 yrs after entry",
+    short: "Earnings (entry)",
+    fmt: fmt.usd,
+    axis: fmt.usdK,
+  },
+  gradDebt: {
+    label: "Median debt at completion",
+    short: "Debt",
+    fmt: fmt.usd,
+    axis: fmt.usdK,
+  },
   cagr: {
     label: "Enrollment growth (annualized)",
     short: "Growth",
@@ -252,6 +272,27 @@ function ols(xs, ys) {
 }
 
 /* ── Load ──────────────────────────────────────────────────────────────── */
+// Rates from cohorts this small swing by 10+ points on a single student (a
+// 1-student cohort reads as 0% or 100%). They stay visible in the table and
+// profile but are kept out of medians, charts, the map and peer benchmarks.
+const MIN_COHORT = 30;
+const COHORT_RATES = [
+  ["gradRate", "gradCohort"],
+  ["retention", "retCohort"],
+];
+// College Scorecard reports earnings and debt for a whole 6-digit OPEID family
+// (main campus plus branches), so every campus carries the same value. Each
+// family counts once in aggregates, on its anchor campus; branches show the
+// shared value but are held out like small cohorts.
+const SCORECARD_KEYS = ["earnings4yr", "earnings10yr", "gradDebt"];
+// A held-out value is visible in the table and profile, never in aggregates.
+const held = (d, key) => d[key] == null && d[key + "Held"] != null;
+const heldNote = (d, key) => (d.heldNote && d.heldNote[key]) || "";
+function holdOut(d, key, note) {
+  d[key + "Held"] = d[key];
+  d[key] = null;
+  (d.heldNote ||= {})[key] = note;
+}
 async function boot() {
   const [panel, map] = await Promise.all([
     fetch("data/institutions.json").then((r) => r.json()),
@@ -283,6 +324,14 @@ async function boot() {
         ? (last / first) ** (1 / span) - 1
         : null;
     d.complete = s.every((v) => v != null);
+    for (const [key, cohortKey] of COHORT_RATES) {
+      if (d[key] != null && d[cohortKey] != null && d[cohortKey] < MIN_COHORT)
+        holdOut(
+          d,
+          key,
+          "Cohort of " + d[cohortKey] + " — too small to compare",
+        );
+    }
     d.searchKey = (
       (d.name || "") +
       " " +
@@ -293,9 +342,56 @@ async function boot() {
     return d;
   });
 
+  const anchors = new Map();
+  for (const d of state.all)
+    if (d.scAnchor && d.scShared > 1) anchors.set(d.opeid6, d.name);
+  for (const d of state.all) {
+    if (!(d.scShared > 1)) continue;
+    for (const key of SCORECARD_KEYS) {
+      if (d[key] == null || d.scAnchor) continue;
+      holdOut(
+        d,
+        key,
+        "Reported for " +
+          d.scShared +
+          " campuses together; counted once, under " +
+          anchors.get(d.opeid6),
+      );
+    }
+  }
+
   buildControls();
   applyFilters();
   renderAll();
+
+  // Colorado state data (optional): resident FTE and governing board per UNITID.
+  try {
+    const co = await fetch("data/colorado.json").then((r) => r.json());
+    const years = co.meta.fteYears;
+    const boards = new Map(co.boards.map((b) => [b.id, b.name]));
+    state.colorado = new Map();
+    for (const inst of co.institutions) {
+      const rec = state.colorado.get(inst.unitid) || {
+        board: inst.board,
+        boardName: boards.get(inst.board),
+        year: years[years.length - 1],
+        resident: 0,
+        campuses: [],
+      };
+      rec.resident += inst.resident[years.length - 1] || 0;
+      rec.campuses.push(inst.name);
+      state.colorado.set(inst.unitid, rec);
+    }
+  } catch (err) {
+    state.colorado = null;
+  }
+
+  // Deep link from the Colorado panel: #inst=<UNITID> opens that profile.
+  const deep = /(?:^|[#&])inst=(\d+)/.exec(location.hash);
+  if (deep) {
+    const hit = state.all.find((d) => String(d.id) === deep[1]);
+    if (hit) openDrawer(hit);
+  }
 
   const loader = document.getElementById("loading");
   loader.classList.add("loading--out");
@@ -320,6 +416,43 @@ function vintageLabel(meta) {
   return meta.primaryYear + " · grad rate " + grad + " · aid " + aid;
 }
 
+// NCES file prefixes -> plain component names for the provisional note.
+const COMPONENT_NAMES = [
+  ["ADM", "admissions"],
+  ["COST", "tuition"],
+  ["EFIA", "12-month enrollment (FTE)"],
+  ["EF", "fall enrollment (retention, S:F ratio)"],
+  ["GR", "graduation rates"],
+  ["SFA", "financial aid"],
+];
+
+function renderProvisional(meta) {
+  const files = meta.provisional || [];
+  const status = document.getElementById("hdr-status");
+  const note = document.getElementById("foot-provisional");
+  if (!files.length) {
+    status.hidden = true;
+    note.textContent =
+      "All components are NCES final releases, which include institutions' revisions.";
+    return;
+  }
+  const names = [
+    ...new Set(
+      files.map(
+        (f) => (COMPONENT_NAMES.find(([p]) => f.startsWith(p)) || [f, f])[1],
+      ),
+    ),
+  ];
+  status.hidden = false;
+  status.textContent = " (provisional)";
+  note.textContent =
+    "Provisional NCES release for " +
+    names.join(", ") +
+    ". Institutions can still revise these figures, and the final release " +
+    "replaces them about a year later. Revisions to the 2023 files changed " +
+    "fewer than 1.5% of values.";
+}
+
 function buildControls() {
   const { meta, all } = state;
 
@@ -331,6 +464,15 @@ function buildControls() {
   document.getElementById("foot-aidyear").textContent = meta.aidYear;
   document.getElementById("foot-gradyear").textContent =
     meta.gradYear ?? meta.primaryYear;
+  renderProvisional(meta);
+  const sc = meta.scorecard;
+  if (sc) {
+    document.getElementById("foot-screlease").textContent = sc.release;
+    document.getElementById("foot-sccohorts").textContent =
+      SCORECARD_KEYS.map(
+        (k) => METRICS[k].label.replace("Median ", "") + ": " + sc.cohorts[k],
+      ).join("; ") + ".";
+  }
 
   // Control chips with counts
   const controlBox = document.getElementById("f-control");
@@ -1407,6 +1549,8 @@ const COLUMNS = [
   { key: "admitRate", label: "Admit" },
   { key: "pellPct", label: "Pell" },
   { key: "tuitionIn", label: "Tuition (in)" },
+  { key: "earnings4yr", label: "Earnings" },
+  { key: "gradDebt", label: "Debt" },
   { key: "cagr", label: "Growth" },
   { key: "series", label: "Trend", type: "spark", sortable: false },
 ];
@@ -1494,7 +1638,13 @@ function renderTable() {
       } else if (col.type === "spark") {
         td.innerHTML = sparkline(d.series);
       } else {
-        td.innerHTML = or(METRICS[col.key].fmt(d[col.key]));
+        if (held(d, col.key)) {
+          td.innerHTML =
+            '<span class="is-small">' +
+            METRICS[col.key].fmt(d[col.key + "Held"]) +
+            "</span>";
+          td.title = heldNote(d, col.key);
+        } else td.innerHTML = or(METRICS[col.key].fmt(d[col.key]));
       }
       row.append(td);
     });
@@ -1636,7 +1786,44 @@ const DRAWER_METRICS = [
   "tuitionOut",
   "cagr",
 ];
-const BENCH_METRICS = ["gradRate", "retention", "sfr", "pellPct", "tuitionIn"];
+const BENCH_METRICS = [
+  "gradRate",
+  "retention",
+  "sfr",
+  "pellPct",
+  "tuitionIn",
+  "earnings4yr",
+  "gradDebt",
+];
+
+// quiet: omit the per-card note (the Scorecard section explains sharing once).
+function drawerMetric(d, k, quiet) {
+  const note = !quiet && held(d, k) ? heldNote(d, k) : "";
+  return (
+    '<div class="dtl__metric"><dt>' +
+    METRICS[k].label +
+    "</dt><dd>" +
+    (held(d, k)
+      ? '<span class="dtl__held">' + METRICS[k].fmt(d[k + "Held"]) + "</span>"
+      : or(METRICS[k].fmt(d[k]))) +
+    (note ? '<span class="dtl__note">' + escapeHtml(note) + "</span>" : "") +
+    "</dd></div>"
+  );
+}
+
+function scorecardFamilyNote(d) {
+  if (!(d.scShared > 1)) return "";
+  const anchor = state.all.find((x) => x.opeid6 === d.opeid6 && x.scAnchor);
+  return d.scAnchor
+    ? "These values cover " +
+        d.scShared +
+        " campuses that report to the Scorecard together. "
+    : "Shared by " +
+        d.scShared +
+        " campuses that report together, so they are counted once, under " +
+        (anchor ? anchor.name : "the main campus") +
+        ". ";
+}
 
 function openDrawer(d, keepScroll) {
   state.selected = d;
@@ -1688,16 +1875,16 @@ function openDrawer(d, keepScroll) {
         k !== "tuitionDistrict" ||
         (d.tuitionDistrict != null && d.tuitionDistrict !== d.tuitionIn),
     )
-      .map(
-        (k) =>
-          '<div class="dtl__metric"><dt>' +
-          METRICS[k].label +
-          "</dt><dd>" +
-          or(METRICS[k].fmt(d[k])) +
-          "</dd></div>",
-      )
+      .map((k) => drawerMetric(d, k))
       .join("") +
     "</dl></section>" +
+    '<section class="dtl__section"><h3 class="dtl__h">Earnings &amp; debt · College Scorecard</h3><dl class="dtl__grid">' +
+    SCORECARD_KEYS.map((k) => drawerMetric(d, k, true)).join("") +
+    '</dl><p class="card__foot">' +
+    escapeHtml(scorecardFamilyNote(d)) +
+    "Federal-aid recipients only; earnings of those working and not enrolled. " +
+    "Cohorts differ by measure: see Sources &amp; method.</p></section>" +
+    coloradoHtml(d) +
     '<section class="dtl__section"><h3 class="dtl__h">Undergraduate FTE, ' +
     years[0] +
     "–" +
@@ -1738,6 +1925,32 @@ function openDrawer(d, keepScroll) {
 
   renderDetailChart(d, peers);
   renderTableSelection();
+}
+
+function coloradoHtml(d) {
+  const co = state.colorado && state.colorado.get(d.id);
+  if (!co) return "";
+  const theme = /(?:^|[#&])theme=(dark|light)\b/.exec(location.hash);
+  const href =
+    "colorado.html#board=" + co.board + (theme ? "&theme=" + theme[1] : "");
+  return (
+    '<section class="dtl__section"><h3 class="dtl__h">Colorado state data · CDHE</h3>' +
+    '<dl class="dtl__grid"><div class="dtl__metric"><dt>Resident FTE, ' +
+    escapeHtml(co.year.replace("FY ", "")) +
+    '</dt><dd class="mono">' +
+    co.resident.toLocaleString("en-US") +
+    '</dd></div><div class="dtl__metric"><dt>Governing board</dt><dd>' +
+    escapeHtml(co.boardName) +
+    '</dd></div></dl><p class="card__foot">' +
+    (co.campuses.length > 1
+      ? "Sums " +
+        escapeHtml(co.campuses.join(" and ")) +
+        ", which IPEDS reports as one unit. "
+      : "") +
+    'State fiscal-year FTE, not comparable to the IPEDS FTE above. <a href="' +
+    href +
+    '">Open the Colorado panel</a> for board funding and trends.</p></section>'
+  );
 }
 
 function tag(text, color) {
@@ -1923,10 +2136,17 @@ function exportCsv() {
     "fte",
     "sfr",
     "gradRate",
+    "gradCohort",
     "retention",
+    "retCohort",
     "admitRate",
     "yieldRate",
     "pellPct",
+    "earnings4yr",
+    "earnings10yr",
+    "gradDebt",
+    "opeid6",
+    "scShared",
     "pellAvg",
     "tuitionDistrict",
     "tuitionIn",
@@ -1942,9 +2162,10 @@ function exportCsv() {
   };
   const body = state.view
     .map((d) =>
-      [...keys.map((k) => cell(d[k])), ...d.series.map((v) => cell(v))].join(
-        ",",
-      ),
+      [
+        ...keys.map((k) => cell(d[k] ?? d[k + "Held"])),
+        ...d.series.map((v) => cell(v)),
+      ].join(","),
     )
     .join("\n");
 

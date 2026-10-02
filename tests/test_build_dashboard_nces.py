@@ -102,3 +102,94 @@ def test_fetch_component_uses_original_when_no_revision(tmp_path):
     frame = nces.fetch_component("HD2023", raw_dir=tmp_path)
     assert frame.attrs["source_file"] == "HD2023.csv"
     assert list(frame.index) == [7]
+
+
+def test_fetch_component_accepts_uppercase_rv_suffix(tmp_path):
+    # NCES's 2026 re-publication names some revisions ``adm2023_RV.csv``.
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("adm2023.csv", "UNITID,APPLCN\n1,10\n")
+        zf.writestr("adm2023_RV.csv", "UNITID,APPLCN\n1,12\n")
+    (tmp_path / "ADM2023.zip").write_bytes(buf.getvalue())
+    frame = nces.fetch_component("ADM2023", raw_dir=tmp_path)
+    assert frame.attrs["source_file"] == "adm2023_RV.csv"
+    assert frame.loc[1, "APPLCN"] == 12
+
+
+@pytest.mark.parametrize(
+    "year, stem",
+    [(2022, "IC2022_AY"), (2023, "IC2023_AY"), (2024, "COST1_2024"), (2025, "COST1_2025")],
+)
+def test_tuition_moves_to_cost_component_in_2024(year, stem):
+    # IC{Y}_AY stops at 2023; 2024-25 tuition is only in the winter Cost file.
+    assert nces.tuition_stem(year) == stem
+
+
+@pytest.mark.parametrize(
+    "stem, source, expected",
+    [
+        ("GR2024", "gr2024.csv", True),  # first release, no revision yet
+        ("GR2023", "gr2023_RV.csv", False),
+        ("EF2024D", "ef2024d.csv", True),
+        ("EFIA2025", "efia2025.csv", True),
+        ("COST1_2024", "cost1_2024.csv", True),
+        ("SFA2223", "sfa2223_RV.csv", False),
+        ("HD2024", "hd2024.csv", False),  # directory: never revised
+        ("IC2023_AY", "ic2023_ay.csv", False),
+    ],
+)
+def test_is_provisional(stem, source, expected):
+    assert nces.is_provisional(stem, source) is expected
+
+
+def test_download_falls_back_to_legacy_path(tmp_path, monkeypatch):
+    # Only the legacy path has the file: the current path 404s.
+    payload = io.BytesIO()
+    with zipfile.ZipFile(payload, "w") as zf:
+        zf.writestr("hd2013.csv", "UNITID,X\n1,2\n")
+    tried = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def fake_urlopen(request, timeout):
+        tried.append(request.full_url)
+        if request.full_url.startswith(nces.NCES_BASE):
+            raise nces.urllib.error.HTTPError(request.full_url, 404, "nf", {}, None)
+        return Resp(payload.getvalue())
+
+    monkeypatch.setattr(nces.urllib.request, "urlopen", fake_urlopen)
+    frame = nces.fetch_component("HD2013", raw_dir=tmp_path)
+    assert frame.loc[1, "X"] == 2
+    assert [u.split("/ipeds/")[1].split("/")[0] for u in tried] == [
+        "complete-data-files",
+        "datacenter",
+    ]
+
+
+def test_download_reports_missing_when_neither_path_has_file(tmp_path, monkeypatch):
+    def fake_urlopen(request, timeout):
+        raise nces.urllib.error.HTTPError(request.full_url, 404, "nf", {}, None)
+
+    monkeypatch.setattr(nces.urllib.request, "urlopen", fake_urlopen)
+    with pytest.raises(nces.MissingFile):
+        nces.fetch_component("GR2099", raw_dir=tmp_path)
+
+
+def test_refresh_keeps_cache_when_new_download_is_unusable(tmp_path, monkeypatch):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("hd2015.csv", "UNITID,X\n1,7\n")
+    (tmp_path / "HD2015.zip").write_bytes(buf.getvalue())
+
+    def fake_download(stem, zpath, retries):
+        zpath.write_bytes(b"")  # NCES has returned empty bodies for old years
+
+    monkeypatch.setattr(nces, "_download", fake_download)
+    frame = nces.fetch_component("HD2015", raw_dir=tmp_path, refresh=True)
+    assert frame.loc[1, "X"] == 7
+    assert not (tmp_path / "HD2015.zip.part").exists()

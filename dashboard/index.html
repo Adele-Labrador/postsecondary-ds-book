@@ -206,12 +206,19 @@
           <h1 class="header__title">Institutional metrics explorer</h1>
           <p class="header__meta">
             Real IPEDS data ·
-            <span id="hdr-year">—</span> ·
+            <span id="hdr-year">—</span
+            ><span id="hdr-status" class="header__status" hidden></span> ·
             <span id="hdr-count">—</span> institutions
           </p>
         </div>
         <div class="header__chips" id="active-chips" aria-live="polite"></div>
         <div class="header__actions">
+          <a
+            class="btn btn--ghost header__link"
+            href="colorado.html"
+            id="co-link"
+            >Colorado panel</a
+          >
           <button class="btn btn--ghost" id="export">Export CSV</button>
           <button
             class="btn btn--icon"
@@ -343,7 +350,8 @@
         <footer class="foot">
           <h2 class="foot__title">Sources &amp; method</h2>
           <p>
-            All figures are real IPEDS data, built directly from the
+            Figures are real IPEDS data, except earnings and debt, which come
+            from the College Scorecard. IPEDS data are built directly from the
             <a
               href="https://nces.ed.gov/ipeds/use-the-data"
               target="_blank"
@@ -386,8 +394,33 @@
               tuition are <span class="mono" id="foot-year">—</span>. Graduation
               rates are <span class="mono" id="foot-gradyear">—</span> and
               financial-aid figures are
-              <span class="mono" id="foot-aidyear">—</span>: NCES finalizes
-              those components a year later, and only final releases are used.
+              <span class="mono" id="foot-aidyear">—</span>, because NCES
+              publishes those components a year later.
+              <span id="foot-provisional"></span>
+            </li>
+            <li>
+              <strong>Earnings and debt.</strong> From the
+              <a
+                href="https://collegescorecard.ed.gov/data/"
+                target="_blank"
+                rel="noopener"
+                >College Scorecard</a
+              >
+              (<span class="mono" id="foot-screlease">—</span> release),
+              covering only students who received federal aid. Earnings are
+              medians for those working and not enrolled. The three measures use
+              different cohorts: <span id="foot-sccohorts"></span> Scorecard
+              reports a main campus and its branches together (one 6-digit
+              OPEID), so each such family counts once, on its main campus;
+              branches show the shared value in grey. Earnings are not adjusted
+              for regional cost of living or program mix.
+            </li>
+            <li>
+              <strong>Small cohorts.</strong> Graduation and retention rates
+              based on fewer than 30 students are shown in grey in the table and
+              profiles, but left out of medians, charts, the map and peer
+              benchmarks. With a cohort of one student, the rate can only be 0%
+              or 100%.
             </li>
             <li>
               <strong>Missing data.</strong> IPEDS suppresses or omits metrics

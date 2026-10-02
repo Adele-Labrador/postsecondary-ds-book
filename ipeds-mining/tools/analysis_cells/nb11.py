@@ -503,10 +503,11 @@ CELLS = [
     funding, while its URM students complete at lower rates, because the formula
     measures who enrolls and how everyone fares, not how the gap changes. The
     graduation-rate metric includes all students, so closing a gap helps only through
-    the overall rate. HB 26-1345 adds definitions that better account for transfer
-    students and counts part-time students
-    ([Chalkbeat](https://www.chalkbeat.org/colorado/2026/04/27/colorado-lawmakers-plan-higher-ed-funding-formula-update/)),
-    but the public descriptions do not say whether it disaggregates outcomes.
+    the overall rate. HB 26-1345 adds first-time part-time students to the retention
+    rate and widens the transfer credit, but the enacted text
+    ([Chapter 391](https://leg.colorado.gov/laws/session-laws/HB26-1345/391/download))
+    adds no disaggregated outcome metric. The guidebook's HB 26-1345 section lists the
+    changes.
 
     ## Takeaways
 

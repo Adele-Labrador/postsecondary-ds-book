@@ -506,8 +506,168 @@ CELLS = [
     the overall rate. HB 26-1345 adds first-time part-time students to the retention
     rate and widens the transfer credit, but the enacted text
     ([Chapter 391](https://leg.colorado.gov/laws/session-laws/HB26-1345/391/download))
-    adds no disaggregated outcome metric. The guidebook's HB 26-1345 section lists the
-    changes.
+    adds no disaggregated outcome metric. Section 10 models the changes that IPEDS
+    can see.
+    """),
+    md("""
+    ## 10. HB 26-1345: what the new definitions change
+
+    HB 26-1345 ([Session Laws chapter 391](https://leg.colorado.gov/laws/session-laws/HB26-1345/391/download)) applies from FY 2027-28. It keeps
+    the `D`-ratio arithmetic in sections 2 and 6 word for word, renaming "role and
+    mission share" to "previous share", but it changes what four metrics measure and
+    where the data come from. The first cell lists each change and whether IPEDS can
+    stand in for it.
+    """),
+    code(r"""
+    changes = pd.DataFrame([
+        ("Retention adds first-time part-time students", "23-18-302(17)",
+         "EF D: RRPTCTA, RET_NMP", "yes: sections 10a-10b"),
+        ("Pell-eligible becomes Pell-recipient; concurrent enrollment excluded", "23-18-302(10), (14)",
+         "SFA UPGRNTN already counts recipients; no residency or concurrent split", "already the proxy"),
+        ("Co-located degree partnership students leave graduation cohorts", "23-18-302(2.5), (8), (9)",
+         "none: IPEDS does not flag partnerships", "no"),
+        ("Transfer credit after 18 credit hours from any institution", "23-18-302(4)(b)",
+         "none: no credit hours or destination at transfer (OM transfer-out is the nearest)", "no"),
+        ("Retention and graduation from department data, not IPEDS", "23-18-302(8), (9), (17)",
+         "IPEDS becomes proxy-only for every metric", "section 10c (splicing)"),
+    ], columns=["change", "C.R.S.", "IPEDS stand-in", "modelled here"]).set_index("change")
+    changes
+    """),
+    md("""
+    ### 10a. Inclusive retention
+
+    The new retention rate counts first-time students who start part-time alongside
+    those who start full-time. `EF{y}D` reports both cohorts, so the inclusive rate is
+    `(RET_NMF + RET_NMP) / (RRFTCTA + RRPTCTA)`. The panel uses the same
+    consistent-reporter rule as section 5.
+    """),
+    code(r"""
+    rows = []
+    for y in range(2017, 2024):
+        ef = load(f"EF{y}D", f"Fall {y}", ["UNITID", "RRFTCTA", "RET_NMF", "RRPTCTA", "RET_NMP"])
+        ef = ef.fillna({"RRPTCTA": 0, "RET_NMP": 0})
+        rows += [dict(UNITID=r.UNITID, metric="retention_all", year=y, num=r.RET_NMF + r.RET_NMP,
+                      den=r.RRFTCTA + r.RRPTCTA, src="") for r in ef.itertuples()]
+    inclusive = pd.DataFrame(rows)
+    inclusive["board"] = inclusive["UNITID"].map(board_of)
+
+    years = F.formula_window(T, "retention")
+    full_time = F.board_series(panel[panel["metric"] == "retention"], years)
+    all_starts = F.board_series(inclusive, years)
+    D_incl = D.assign(retention=all_starts.apply(F.d_ratio, axis=1))
+    print(f"consistent reporters: full-time {F.consistent_reporters(panel[panel['metric'] == 'retention'], years).size}, "
+          f"inclusive {F.consistent_reporters(inclusive, years).size}")
+    pd.DataFrame({f"full-time {years[-1]} %": full_time[years[-1]] * 100,
+                  f"inclusive {years[-1]} %": all_starts[years[-1]] * 100,
+                  "level change (pts)": (all_starts[years[-1]] - full_time[years[-1]]) * 100,
+                  "D full-time": D["retention"], "D inclusive": D_incl["retention"],
+                  "D change": D_incl["retention"] - D["retention"]}).round(4)
+    """),
+    md("""
+    Adding part-time starters lowers measured retention most where they are common:
+    by about 4 points at MSU Denver and 6.6 at CCCS in fall 2023, and by about a point
+    or less elsewhere. `D` hardly moves, by 0.004 at most, because
+    the formula scores each board against its own recent past. A level drop that
+    appears in all four years cancels out. What matters is whether part-time retention
+    is improving faster or slower than full-time retention.
+
+    ### 10b. Does IPEDS reproduce the fiscal note?
+
+    The [final fiscal note](https://leg.colorado.gov/bill_files/117653/download) applies the part-time change to FY 2025-26 and
+    reports the reallocation by board (its Table 1, on a $1,034,081,555 base). The cell
+    below applies the IPEDS inclusive `D` to the same year, scales the share changes
+    to the fiscal note's base, and compares the two.
+    """),
+    code(r"""
+    FISCAL_NOTE_BASE = 1_034_081_555
+    # HB 26-1345 final fiscal note (Aug 26, 2026), Table 1
+    fiscal_note = pd.DataFrame({
+        "pell_recipient": {"ASU": -104_573, "CCCS": 1_065_232, "CSM": -28_109, "CSU": -391_139, "FLC": -25_350,
+                           "CMU": -61_879, "MSU": -103_817, "CU": -576_029, "UNC": -28_841, "WCU": 254_505},
+        "part_time": {"ASU": 12_133, "CCCS": 103_945, "CSM": -18_510, "CSU": 19_583, "FLC": -18_136,
+                      "CMU": -4_617, "MSU": 4_493, "CU": -55_707, "UNC": -33_623, "WCU": -9_563},
+    }).reindex(fund.index)
+
+    base = fund["FY 2024-25"]
+    ipeds_pt = (F.step2_shares(base, D_incl) - F.step2_shares(base, D)) * FISCAL_NOTE_BASE
+    pt = pd.DataFrame({"IPEDS estimate ($)": ipeds_pt, "fiscal note ($)": fiscal_note["part_time"]})
+    agree = int((np.sign(pt.iloc[:, 0]) == np.sign(pt.iloc[:, 1])).sum())
+    print(f"correlation {np.corrcoef(pt.iloc[:, 0], pt.iloc[:, 1])[0, 1]:.2f}; signs agree on {agree} of 10 boards; "
+          f"moved ${ipeds_pt.clip(lower=0).sum():,.0f} (IPEDS) vs ${fiscal_note['part_time'].clip(lower=0).sum():,.0f} (fiscal note)")
+    pt.round(0)
+    """),
+    md("""
+    IPEDS does not reproduce the fiscal note. The estimates correlate negatively with
+    it, agree in sign on half the boards, and move less than half as much money. The
+    largest disagreement is CCCS: the fiscal note gives it the largest gain, about
+    $104,000, while IPEDS gives it a loss. That is the section 5 problem again. The
+    CCCS part-time cohort IPEDS reports fell from 1,430 students in fall 2019 to 626 in
+    fall 2022, as colleges were reclassified, and the consistent-reporter rule keeps
+    only the colleges that were never reclassified. The state counts every college's
+    part-time starters in its own data. For the boards IPEDS measures well, both sources
+    put the amounts in the tens of thousands of dollars. At that size, modest
+    differences between IPEDS and state cohorts can flip the sign.
+
+    The Pell change cannot be tested at all. The fiscal note differences Pell-recipient
+    against Pell-eligible allocations, and IPEDS has no Pell-eligible count. The
+    recipient-based proxy in section 6 is already measuring roughly what the new law
+    asks for.
+
+    ### 10c. The splicing trap
+
+    When the definitions change, the state can recompute all four window years under
+    the new rules, or let new-definition years enter the window one at a time. The act
+    does not say which. Splicing puts a definitional change into the numerator of `D`
+    in the same way IPEDS reclassification does. The cell below compares the two for
+    the first year a splice would occur: three full-time-only years plus one inclusive
+    year.
+    """),
+    code(r"""
+    spliced = full_time.copy()
+    spliced[years[-1]] = all_starts[years[-1]]
+    D_splice = D.assign(retention=spliced.apply(F.d_ratio, axis=1))
+    splice_dollars = (F.step2_shares(base, D_splice) - F.step2_shares(base, D)) * FISCAL_NOTE_BASE
+    splice = pd.DataFrame({"D recomputed": D_incl["retention"], "D spliced": D_splice["retention"],
+                           "recomputed ($)": ipeds_pt, "spliced ($)": splice_dollars})
+    print(f"moved between boards: recomputed ${ipeds_pt.clip(lower=0).sum():,.0f}, "
+          f"spliced ${splice_dollars.clip(lower=0).sum():,.0f}")
+    splice.round(4)
+    """),
+    md("""
+    Splicing moves about $984,000 between boards, against $59,000 for a consistent
+    recomputation, roughly seventeen times as much. That is almost as much as all eight
+    metrics together moved in FY 2025-26 ($1.11 million, section 7). CCCS alone would
+    lose about $894,000 and MSU Denver about $90,000, simply because they enrol the
+    most part-time students, whose lower retention would read as a decline. CU and CSU
+    would gain for the same reason in reverse. None of this would reflect any change in
+    students' outcomes. A study of FY 2027-28 should therefore check CDHE's data
+    definitions for how the window is built before treating any board's change as
+    performance.
+
+    ### 10d. Definitions versus performance
+
+    The fiscal note's two columns can be set beside the performance reallocation from
+    section 7.
+    """),
+    code(r"""
+    compare = pd.DataFrame({
+        "FY 2025-26 performance": moved["moved"],
+        "Pell-recipient switch": fiscal_note["pell_recipient"],
+        "part-time retention": fiscal_note["part_time"],
+    })
+    compare["both definition changes"] = compare["Pell-recipient switch"] + compare["part-time retention"]
+    summary = compare.clip(lower=0).sum().rename("moved between boards ($)")
+    print(summary.map("{:,.0f}".format).to_string())
+    compare.round(0)
+    """),
+    md("""
+    The two definitional changes would move about $1.41 million between boards, more
+    than the $1.11 million that a full year of performance moved in FY 2025-26, with no
+    change in what students did. Almost all of it comes from the Pell switch
+    ($1.32 million), and almost all of it goes to CCCS and Western. The bases differ
+    ($1.034 billion in the fiscal note, $1.246 billion here), so the comparison is about
+    scale, not exact dollars. The lesson is still clear: in this formula, how a metric
+    is defined can matter as much as how institutions perform on it.
 
     ## Takeaways
 
@@ -523,6 +683,10 @@ CELLS = [
       of the CCCS retention cohort from IPEDS, which is why the state is moving to SURDS.
     - **Access is rewarded; gaps are not.** Forty percent of the weight rewards enrollment
       shares, and no metric rewards closing completion gaps.
+    - **Under HB 26-1345, definitions move as much money as performance.** The fiscal note's
+      Pell and part-time changes reallocate about $1.41 million. Splicing old and new
+      definitions in one window would move nearly $1 million more, with no change in
+      student outcomes.
 
     ## Exercises
 
@@ -536,5 +700,10 @@ CELLS = [
        larger or smaller than the URM gap on each board?
     5. When the 2024 IPEDS files are published, reconstruct FY 2026-27 and compare it
        with the request's Step 2 adjustments in section 7.
+    6. Repeat section 10c with two and three new-definition years in the window. How
+       long does a splice keep distorting `D`, and does the distortion change sign?
+    7. Section 10b keeps only consistent reporters. Rebuild the inclusive retention
+       panel for CCCS from all thirteen colleges' two-year and four-year cohorts. Does
+       the CCCS estimate move toward the fiscal note's +$103,945?
     """),
 ]

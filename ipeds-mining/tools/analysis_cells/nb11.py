@@ -521,7 +521,7 @@ CELLS = [
     code(r"""
     changes = pd.DataFrame([
         ("Retention adds first-time part-time students", "23-18-302(17)",
-         "EF D: RRPTCTA, RET_NMP", "yes: sections 10a-10b"),
+         "EF D: RRPTCTA, RET_NMP", "yes: sections 10a-10c"),
         ("Pell-eligible becomes Pell-recipient; concurrent enrollment excluded", "23-18-302(10), (14)",
          "SFA UPGRNTN already counts recipients; no residency or concurrent split", "already the proxy"),
         ("Co-located degree partnership students leave graduation cohorts", "23-18-302(2.5), (8), (9)",
@@ -529,7 +529,7 @@ CELLS = [
         ("Transfer credit after 18 credit hours from any institution", "23-18-302(4)(b)",
          "none: no credit hours or destination at transfer (OM transfer-out is the nearest)", "no"),
         ("Retention and graduation from department data, not IPEDS", "23-18-302(8), (9), (17)",
-         "IPEDS becomes proxy-only for every metric", "section 10c (splicing)"),
+         "IPEDS becomes proxy-only for every metric", "section 10d (splicing)"),
     ], columns=["change", "C.R.S.", "IPEDS stand-in", "modelled here"]).set_index("change")
     changes
     """),
@@ -613,7 +613,122 @@ CELLS = [
     recipient-based proxy in section 6 is already measuring roughly what the new law
     asks for.
 
-    ### 10c. The splicing trap
+    ### 10c. CCCS sensitivity: can all thirteen colleges be used?
+
+    The CCCS estimate rests on the six colleges that report a positive retention
+    cohort under one definition in every window year. The cell below asks how much
+    that choice matters. It recomputes CCCS's full-time and inclusive `D`, and the
+    part-time reallocation, under four alternatives, holding every other board at
+    its section 10b values:
+
+    - **all 13, pooled as reported**: every college's cohort in every year, so
+      colleges enter and leave the pool as IPEDS reclassifies them;
+    - **all 13, invisible colleges held flat**: each college without a full window
+      keeps its last cohort that was at least a quarter of its fall 2016 size, at the
+      same rate, in every window year. This fixes the composition at all thirteen and
+      assumes no change at the colleges IPEDS cannot see;
+    - **leave one out**: the baseline with each of the six colleges dropped in turn.
+    """),
+    code(r"""
+    cccs_ids = board_of[board_of == "CCCS"].index
+    cccs_ft = panel[(panel["metric"] == "retention") & panel["UNITID"].isin(cccs_ids)]
+    cccs_in = inclusive[inclusive["UNITID"].isin(cccs_ids)]
+    visible = F.consistent_reporters(cccs_in, years)
+
+
+    def pooled_d(frame):
+        g = frame[frame["year"].isin(years)].groupby("year")[["num", "den"]].sum().reindex(years)
+        return F.d_ratio(g["num"] / g["den"]), g["den"]
+
+
+    def held_flat(frame, min_share=0.25):
+        parts = [frame[frame["UNITID"].isin(visible) & frame["year"].isin(years)]]
+        held = {}
+        for u in sorted(set(cccs_ids) - set(visible)):
+            q = frame[(frame["UNITID"] == u) & (frame["year"] <= years[-1])].sort_values("year")
+            first = q[q["year"] == 2017]["den"].sum()
+            q = q[q["den"] >= min_share * first]
+            if q.empty or first == 0:
+                continue
+            last = q.iloc[-1]
+            held[instnm[u]] = (int(last["year"]), int(last["den"]))
+            parts.append(pd.DataFrame({"UNITID": u, "year": years, "num": last["num"], "den": last["den"]}))
+        return pd.concat(parts), held
+
+
+    def cccs_effect(d_ft, d_in):
+        d0 = D.copy()
+        d0.loc["CCCS", "retention"] = d_ft
+        d1 = D_incl.copy()
+        d1.loc["CCCS", "retention"] = d_in
+        return (F.step2_shares(base, d1)["CCCS"] - F.step2_shares(base, d0)["CCCS"]) * FISCAL_NOTE_BASE
+
+
+    variants = {
+        "consistent reporters (baseline)": (cccs_ft[cccs_ft["UNITID"].isin(visible)], cccs_in[cccs_in["UNITID"].isin(visible)]),
+        "all 13, pooled as reported": (cccs_ft, cccs_in),
+    }
+    flat_ft, held = held_flat(cccs_ft)
+    flat_in, _ = held_flat(cccs_in)
+    variants["all 13, invisible colleges held flat"] = (flat_ft, flat_in)
+    for u in visible:
+        variants[f"drop {instnm[u]}"] = (cccs_ft[cccs_ft["UNITID"].isin(visible.drop(u))],
+                                        cccs_in[cccs_in["UNITID"].isin(visible.drop(u))])
+
+    rows = []
+    for label, (ft_frame, in_frame) in variants.items():
+        d_ft, _ = pooled_d(ft_frame)
+        d_in, cohort = pooled_d(in_frame)
+        rows.append({"variant": label, "colleges in window": in_frame.loc[in_frame["year"].isin(years) & (in_frame["den"] > 0), "UNITID"].nunique(),
+                     "inclusive cohort, newest year": cohort[years[-1]], "D full-time": d_ft,
+                     "D inclusive": d_in, "D gap": d_in - d_ft, "CCCS part-time effect ($)": cccs_effect(d_ft, d_in)})
+    sensitivity = pd.DataFrame(rows).set_index("variant")
+    print("held flat at (year, full-time cohort):", ", ".join(f"{k} ({y}, {n:,})" for k, (y, n) in held.items()))
+    loo = sensitivity.filter(like="drop", axis=0)["CCCS part-time effect ($)"]
+    print(f"leave-one-out range ${loo.min():,.0f} to ${loo.max():,.0f}; fiscal note ${fiscal_note.loc['CCCS', 'part_time']:,.0f}")
+    sensitivity.round(4)
+    """),
+    code(r"""
+    from scipy.optimize import brentq
+
+    d_ft0 = sensitivity.loc["consistent reporters (baseline)", "D full-time"]
+    needed = brentq(lambda d: cccs_effect(d_ft0, d) - fiscal_note.loc["CCCS", "part_time"], 0.9, 1.1)
+
+    fall16 = cccs_ft[cccs_ft["year"] == 2017].set_index("UNITID")["den"]
+    fall16_pt = cccs_in[cccs_in["year"] == 2017].set_index("UNITID")["den"] - fall16
+    print(f"to reproduce the fiscal note, CCCS inclusive D must be {needed:.4f}: "
+          f"{needed - d_ft0:+.4f} against full-time D (baseline gap "
+          f"{sensitivity.loc['consistent reporters (baseline)', 'D gap']:+.4f})")
+    print(f"the six visible colleges were {fall16[visible].sum() / fall16.sum():.0%} of CCCS full-time and "
+          f"{fall16_pt[visible].sum() / fall16_pt.sum():.0%} of part-time starters in fall 2016, "
+          f"the last year all 13 reported ({fall16.sum():,.0f} and {fall16_pt.sum():,.0f} students)")
+    """),
+    md("""
+    No version of the IPEDS data reproduces the fiscal note. Pooling all thirteen
+    colleges as reported adds only three colleges inside the window. Arapahoe's single
+    fall 2019 cohort (1,075 starters, 46% retained) lands in the oldest year, and Red
+    Rocks and Pueblo contribute a handful of bachelor's seekers. That is enough to flip
+    the CCCS estimate from -$46,590 to +$27,810. It is the reclassification artifact
+    from section 5 once more: a large, low-retention cohort that appears in the oldest
+    year only raises `D` without any change in students' outcomes.
+
+    Holding the seven invisible colleges flat fixes the composition at all thirteen,
+    which pulls both `D` ratios toward one (full-time from 1.022 to 1.005). The
+    inclusive ratio still sits below the full-time one, so CCCS still loses, about
+    $59,500. Dropping one visible college at a time gives anything from -$190,425
+    (without Aurora, the largest part-time cohort among the six) to +$32,587. The sign
+    of the estimate depends on which single college is included.
+
+    Reproducing the fiscal note's +$103,945 would need CCCS's inclusive `D` to sit
+    about 0.003 above its full-time `D`. Every variant here leaves the two within about
+    0.001 of each other or puts the inclusive ratio below. The visible colleges were 29%
+    of CCCS full-time starters and only 12% of part-time starters in fall 2016, the last
+    year all thirteen reported. The state's figure plausibly reflects part-time
+    retention trends at the large colleges IPEDS stopped measuring, such as Front
+    Range, Pikes Peak, and Red Rocks. That is a question for SURDS, not IPEDS. Within IPEDS, the defensible
+    statement is a bound: the data cannot even fix the sign of CCCS's part-time effect.
+
+    ### 10d. The splicing trap
 
     When the definitions change, the state can recompute all four window years under
     the new rules, or let new-definition years enter the window one at a time. The act
@@ -644,7 +759,7 @@ CELLS = [
     definitions for how the window is built before treating any board's change as
     performance.
 
-    ### 10d. Definitions versus performance
+    ### 10e. Definitions versus performance
 
     The fiscal note's two columns can be set beside the performance reallocation from
     section 7.
@@ -702,8 +817,9 @@ CELLS = [
        with the request's Step 2 adjustments in section 7.
     6. Repeat section 10c with two and three new-definition years in the window. How
        long does a splice keep distorting `D`, and does the distortion change sign?
-    7. Section 10b keeps only consistent reporters. Rebuild the inclusive retention
-       panel for CCCS from all thirteen colleges' two-year and four-year cohorts. Does
-       the CCCS estimate move toward the fiscal note's +$103,945?
+    7. Section 10c holds the invisible CCCS colleges flat. Replace that assumption with
+       each college's own 2017-2019 trend, extrapolated. How far must the invisible
+       colleges' part-time retention rise, relative to full-time, to reach the fiscal
+       note's +$103,945?
     """),
 ]

@@ -93,6 +93,9 @@ python -m src.ingest.colorado_finance   # IPEDS campus finances
 python -m src.ingest.colorado_audited   # audited CU and CSU statements, FY2024-25
 ```
 
+The funding formula lab (`dashboard/data/colorado_formula.json`) is written by
+notebook 11 in `ipeds-mining/`; see `dashboard/README.md`.
+
 ## A note on real IPEDS variable codes
 
 The raw column names referenced in `src/ingest/` (e.g. `EFTOTLT`, `CONTROL`,

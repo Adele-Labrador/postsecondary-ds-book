@@ -21,6 +21,8 @@ descriptive-trend baseline in `src/models/forecast_enrollment.py`.
 | `data/colorado.json`           | 13 governing boards, 29 institutions, FY2007-08 to FY2025-26        |
 | `data/colorado_finance.json`   | IPEDS finance + FTE for 27 Colorado units, FY2014-15 to FY2023-24   |
 | `data/colorado_audited.json`   | Audited CU and CSU statement lines, FY2023-24 and FY2024-25         |
+| `colorado-lab.js`              | Colorado panel: funding formula lab and IPEDS coverage panel        |
+| `data/colorado_formula.json`   | Step 2 window series, coverage status and CCCS sensitivity (nb 11)  |
 
 ## Rebuilding the data
 
@@ -289,3 +291,31 @@ cd dashboard && python3 -m http.server 8000
 - [NCES IPEDS Complete Data Files](https://nces.ed.gov/ipeds/use-the-data)
 - [Urban Institute Education Data Portal](https://educationdata.urban.org/documentation/colleges.html) (reconciliation source)
 - [Carnegie Classification](https://carnegieclassifications.acenet.edu/)
+
+### Funding formula lab and coverage panel
+
+`data/colorado_formula.json` is written by the appendix of
+`ipeds-mining/notebooks/11_colorado_performance_funding.ipynb`, so the lab and the
+notebook cannot disagree. It holds each board's four-year window series for the
+seven measurable Step 2 metrics, the inclusive (full-time plus part-time) retention
+series used for HB 26-1345, the fiscal note's Table 1, per-institution coverage
+status for the FY2025-26 window, and the CCCS sensitivity variants from section 10c.
+To rebuild it, run notebook 11 from `ipeds-mining/notebooks/`:
+
+```bash
+cd ipeds-mining/notebooks
+PYTHONPATH=../src jupyter nbconvert --to notebook --execute --inplace 11_colorado_performance_funding.ipynb
+```
+
+- The lab recomputes `D`, the prior-share adjustment and the weighted Step 2 share
+  in the browser (`labRun` in `colorado-lab.js`), mirroring `ipeds_utils.funding`.
+  With CDHE's weights it reproduces the notebook's reconstruction (correlation
+  0.83 with actual FY2025-26 increases, RMSE 0.50 points).
+- Weights are rescaled to sum to 100. First-generation status has no IPEDS
+  equivalent, so its `D` is fixed at 1 and any weight on it goes to prior shares.
+- "Add part-time, spliced" replaces only the newest window year with the inclusive
+  rate, the mixed-definition case notebook 11 section 10d warns about.
+- Lab state is kept in the URL hash (`lab=10-5-5-20-20-20-10-10~ft`), so a copied
+  link reopens the same weights and retention definition.
+- `tests/test_colorado_formula.py` re-runs the arithmetic on the JSON and checks it
+  against the notebook's results.

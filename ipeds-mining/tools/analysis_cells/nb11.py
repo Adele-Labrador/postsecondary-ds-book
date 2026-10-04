@@ -19,7 +19,7 @@ CELLS = [
     | Inputs | `EF{y}D`, `EF{y}A`, `GR{y}` (2017-2023), `SFA` (2016-17 to 2022-23), `C{y}_A` (2018-2024); board funding and resident FTE from `dashboard/data/colorado.json` in the parent repository |
     | Unit | Governing board (the formula's unit); institutions are aggregated to boards |
     | Methods | Formula reconstruction, out-of-sample validation against appropriations, sensitivity analysis, counterfactual allocation, disaggregated completion gaps |
-    | Outputs | `reports/funding/fy2025_26_reconstruction.csv`, `reports/figures/11_*.png` |
+    | Outputs | `reports/funding/fy2025_26_reconstruction.csv`, `reports/figures/11_*.png`, `dashboard/data/colorado_formula.json` (parent repository) |
 
     **Policy boundary.** HB 20-1366 governs FY 2021-22 to FY 2026-27. HB 26-1345
     ([bill page](https://leg.colorado.gov/bills/hb26-1345)) replaces it from FY 2027-28
@@ -821,5 +821,111 @@ CELLS = [
        each college's own 2017-2019 trend, extrapolated. How far must the invisible
        colleges' part-time retention rise, relative to full-time, to reach the fiscal
        note's +$103,945?
+    """),
+    md("""
+    ## Appendix: data for the dashboard formula lab
+
+    The Colorado panel's formula lab and coverage panel read the objects built above,
+    so the dashboard and this notebook cannot disagree. The cell writes
+    `dashboard/data/colorado_formula.json` when the notebook runs inside the parent
+    repository and checks that the exported window series reproduce the section 6
+    `D` ratios exactly.
+    """),
+    code(r"""
+    import datetime as dt
+
+    LAB = ["retention", "grad100", "grad150", "urm_share", "pell_share", "credentials"]
+    ret_years = F.formula_window(T, "retention")
+    windows, series, reporters = {}, {}, {}
+    for m in LAB:
+        sub = panel[panel["metric"] == m]
+        yrs = F.formula_window(T, m)
+        if yrs[-1] > sub["year"].max():
+            yrs = [y - 1 for y in yrs]
+        windows[m] = yrs
+        series[m] = F.board_series(sub, yrs)
+        keep = F.consistent_reporters(sub, yrs)
+        reporters[m] = sub[sub["UNITID"].isin(keep)].groupby("board")["UNITID"].nunique()
+        assert (series[m].apply(F.d_ratio, axis=1) - D[m]).abs().max() < 1e-12, m
+    fte_years = [F.fiscal_year_label(y) for y in F.formula_window(T, "resident_fte")]
+    series["resident_fte"] = fte.loc[fund.index, fte_years]
+    windows["resident_fte"] = fte_years
+    incl = F.board_series(inclusive, ret_years)
+
+
+    def status(sub, unitid, yrs):
+        q = sub[(sub["UNITID"] == unitid) & sub["year"].isin(yrs)]
+        if q.empty:
+            return "not reported"
+        if unitid in F.consistent_reporters(sub, yrs):
+            return "used"
+        if q["src"].nunique() > 1 if "src" in q else False:
+            return "definition changed"
+        if len(q) < len(yrs) or q["num"].isna().any():
+            return "missing year"
+        return "zero cohort"
+
+
+    cov_metrics = {"retention": panel[panel["metric"] == "retention"], "retention_all": inclusive,
+                   **{m: panel[panel["metric"] == m] for m in LAB[1:]}}
+    cov_windows = {"retention_all": ret_years, **windows}
+    ft_den = cov_metrics["retention"].pivot_table(index="UNITID", columns="year", values="den")
+    all_den = inclusive.pivot_table(index="UNITID", columns="year", values="den")
+    units = []
+    for u, b in sorted(board_of.items(), key=lambda kv: (kv[1], str(instnm.get(kv[0], kv[0])))):
+        units.append({
+            "unitid": int(u), "name": instnm.get(u, str(u)), "board": b,
+            "status": {m: status(sub, u, cov_windows[m]) for m, sub in cov_metrics.items()},
+            "ftCohort": [None if pd.isna(v) else int(v) for v in ft_den.reindex(index=[u], columns=range(2017, 2024)).iloc[0]],
+            "allCohort": [None if pd.isna(v) else int(v) for v in all_den.reindex(index=[u], columns=range(2017, 2024)).iloc[0]],
+        })
+
+    def num(v, places=6):
+        return None if pd.isna(v) else round(float(v), places)
+
+    lab = {
+        "meta": {
+            "built": dt.date.today().isoformat(), "fiscalYear": F.fiscal_year_label(T),
+            "baseYear": F.fiscal_year_label(T - 1), "notebook": "ipeds-mining/notebooks/" + "11_colorado_performance_funding.ipynb",
+            "windows": {m: [str(y) for y in w] for m, w in windows.items()},
+            "retentionYears": ret_years, "cohortYears": list(range(2017, 2024)),
+            "fiscalNoteBase": FISCAL_NOTE_BASE,
+            "sources": {
+                "definitions": "https://cdhe.colorado.gov/sites/highered/files/Colorado_Performance_Funding_Overview_and_Data_Definitions_2025_26_1.pdf",
+                "jbcMemo": "https://content.leg.colorado.gov/sites/default/files/hedainfo-09-09-2025.pdf",
+                "jbcBriefing": "https://content.leg.colorado.gov/sites/default/files/fy2026-27_hedbrf.pdf",
+                "fiscalNote": "https://leg.colorado.gov/bill_files/117653/download",
+                "sessionLaw": "https://leg.colorado.gov/laws/session-laws/HB26-1345/391/download",
+                "ipeds": "https://nces.ed.gov/ipeds/use-the-data",
+            },
+        },
+        "weights": F.WEIGHTS,
+        "metrics": {m: F.METRICS[m] for m in F.WEIGHTS},
+        "boards": [{
+            "id": b, "name": names[b], "base": float(fund.loc[b, F.fiscal_year_label(T - 1)]),
+            "actual": float(fund.loc[b, F.fiscal_year_label(T)]),
+            "series": {m: [num(v) for v in series[m].loc[b]] for m in series},
+            "retentionInclusive": [num(v) for v in incl.loc[b]],
+            "reporters": {m: int(reporters[m].get(b, 0)) for m in LAB},
+            "fiscalNote": {k: int(fiscal_note.loc[b, k]) for k in fiscal_note},
+            "request2627": int(request[b]),
+            "notebookPct": num(pred[b], 4),
+        } for b in fund.index],
+        "units": units,
+        "cccs": {
+            "sensitivity": [{"variant": k, **{c: num(v, 4) for c, v in r.items()}} for k, r in sensitivity.iterrows()],
+            "neededGap": num(needed - d_ft0, 4), "baselineGap": num(sensitivity.iloc[0]["D gap"], 4),
+            "visibleShareFt": num(fall16[visible].sum() / fall16.sum(), 4),
+            "visibleSharePt": num(fall16_pt[visible].sum() / fall16_pt.sum(), 4),
+            "fall16Ft": int(fall16.sum()), "fall16Pt": int(fall16_pt.sum()),
+            "visible": [int(u) for u in visible],
+        },
+    }
+    out = Path("../../dashboard/data")
+    if out.is_dir():
+        (out / "colorado_formula.json").write_text(json.dumps(lab, separators=(",", ":")) + "\n")
+        print(f"wrote {out / 'colorado_formula.json'}: {len(lab['boards'])} boards, {len(units)} IPEDS units")
+    else:
+        print("not inside the parent repository; skipped the dashboard export")
     """),
 ]

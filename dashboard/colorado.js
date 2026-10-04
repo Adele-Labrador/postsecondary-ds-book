@@ -132,6 +132,7 @@ const state = {
   audEntity: "cub",
   audView: "per",
   guideStep: 0,
+  lab: null,
 };
 const charts = {};
 
@@ -319,10 +320,11 @@ async function boot() {
     fetch(url)
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
-  const [data, fin, aud] = await Promise.all([
+  const [data, fin, aud, formula] = await Promise.all([
     fetch("data/colorado.json").then((r) => r.json()),
     optional("data/colorado_finance.json"),
     optional("data/colorado_audited.json"),
+    optional("data/colorado_formula.json"),
   ]);
   state.data = data;
   state.fin = fin;
@@ -330,6 +332,14 @@ async function boot() {
   if (fin) setupFinance();
   else document.getElementById("fin").hidden = true;
   if (aud) setupAudited();
+  state.lab = typeof setupLab === "function" ? formula : null;
+  if (state.lab) setupLab();
+  const ljump = document.getElementById("lab-jump");
+  ljump.hidden = !state.lab;
+  ljump.addEventListener("click", (e) => {
+    e.preventDefault();
+    jumpTo("lab", "lab", "#lab-presets button");
+  });
   const gjump = document.getElementById("guide-jump");
   gjump.hidden = !aud;
   gjump.addEventListener("click", (e) => {
@@ -382,6 +392,12 @@ async function boot() {
     requestAnimationFrame(() =>
       jumpTo("guide", "guide", "#guide-entity", true),
     );
+  if (state.lab && section === "lab")
+    requestAnimationFrame(() =>
+      jumpTo("lab", "lab", "#lab-presets button", true),
+    );
+  if (state.lab && section === "coverage")
+    requestAnimationFrame(() => jumpTo("cov", "coverage", "#cov-board", true));
   const loader = document.getElementById("loading");
   loader.classList.add("loading--out");
   setTimeout(() => (loader.hidden = true), 320);
@@ -408,6 +424,8 @@ function renderAll() {
   renderFinance();
   renderAudited();
   renderGuide();
+  renderLab();
+  renderCoverage();
 }
 
 /* ── KPIs ──────────────────────────────────────────────────────────────── */

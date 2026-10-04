@@ -62,7 +62,26 @@ const LAB_RET = [
   ],
 ];
 
-const lab = { weights: null, ret: "ft" };
+const lab = { weights: null, ret: "ft", fy: 0 };
+
+// The selected fiscal year: FY2025-26 is scored against the actual
+// appropriation, FY2026-27 against the request's Step 2 adjustments.
+function labYear() {
+  return state.lab.years[lab.fy];
+}
+const isRequest = () => labYear().target === "request";
+
+// Shared board facts merged with the selected year's window series.
+function labBoards() {
+  const Y = labYear();
+  return state.lab.boards.map((b) => ({
+    ...b,
+    ...Y.boards[b.id],
+    actual: Y.boards[b.id].target,
+  }));
+}
+const labFy = (fy) => fy.replace("FY ", "FY");
+const fyKey = (y) => y.fiscalYear.replace(/\D/g, "").slice(2);
 
 function dRatio(v) {
   if (!v || v.length !== 4 || v.some((x) => x == null)) return NaN;
@@ -91,7 +110,7 @@ function labD(b, m, ret) {
 
 // Step 2 shares for a weight set (any scale) and retention definition.
 function labRun(weights, ret) {
-  const boards = state.lab.boards;
+  const boards = labBoards();
   const baseSum = boards.reduce((s, b) => s + b.base, 0);
   const pot = boards.reduce((s, b) => s + b.actual, 0);
   const prior = boards.map((b) => b.base / baseSum);
@@ -147,11 +166,15 @@ function labEncode() {
   const isDefault =
     lab.ret === "ft" && LAB_ORDER.every((m) => lab.weights[m] === def[m]);
   hashSet("lab", isDefault ? null : w + "~" + lab.ret);
+  hashSet("labfy", lab.fy === 0 ? null : fyKey(labYear()));
 }
 function labDecode() {
   const raw = hashGet("lab");
   lab.weights = labDefaultWeights();
   lab.ret = "ft";
+  const fy = hashGet("labfy");
+  const i = state.lab.years.findIndex((y) => fyKey(y) === fy);
+  lab.fy = i > 0 ? i : 0;
   if (!raw) return;
   const [w, ret] = raw.split("~");
   const parts = (w || "").split("-").map(Number);
@@ -177,7 +200,26 @@ function setupLab() {
   const L = state.lab;
   document.getElementById("lab").hidden = false;
   document.getElementById("cov").hidden = false;
-  document.getElementById("lab-fy").textContent = shortFy(L.meta.fiscalYear);
+  document.getElementById("lab-years").innerHTML = L.years
+    .map(
+      (y, i) =>
+        '<button class="seg__btn" type="button" role="radio" data-lab-fy="' +
+        i +
+        '">' +
+        labFy(y.fiscalYear) +
+        "</button>",
+    )
+    .join("");
+  document.querySelectorAll("[data-lab-fy]").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      lab.fy = Number(btn.dataset.labFy);
+      labEncode();
+      renderLab();
+      renderCovMatrix();
+      renderLabFoot();
+      renderCovFoot();
+    }),
+  );
 
   const wrap = document.getElementById("lab-weights");
   wrap.innerHTML = LAB_ORDER.map((m) => {
@@ -253,8 +295,12 @@ function setupLab() {
   document.getElementById("lab-reset").addEventListener("click", () => {
     lab.weights = labDefaultWeights();
     lab.ret = "ft";
+    lab.fy = 0;
     labEncode();
     renderLab();
+    renderCovMatrix();
+    renderLabFoot();
+    renderCovFoot();
   });
   const copy = document.getElementById("lab-copy");
   copy.addEventListener("click", async () => {
@@ -279,6 +325,19 @@ function setupLab() {
 function renderLab() {
   if (!state.lab) return;
   const W = lab.weights;
+  const Y = labYear();
+  const req = isRequest();
+  document.getElementById("lab-fy").textContent = labFy(Y.fiscalYear);
+  document.getElementById("lab-sub").textContent = req
+    ? "Re-run Step 2 with your own weights and compare it with the " +
+      labFy(Y.fiscalYear) +
+      " request, a year the reconstruction was not tuned on"
+    : "Re-run Step 2 with your own weights and metric definitions";
+  document.querySelectorAll("[data-lab-fy]").forEach((btn) => {
+    const on = Number(btn.dataset.labFy) === lab.fy;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-checked", on ? "true" : "false");
+  });
   const total = LAB_ORDER.reduce((s, m) => s + W[m], 0);
   LAB_ORDER.forEach((m) => {
     document.getElementById("lab-w-" + m).value = W[m];
@@ -315,9 +374,23 @@ function renderLab() {
   const ref = labRun(def, "ft");
   const actual = rows.map((r) => r.actualPct);
   const model = rows.map((r) => r.pct);
-  const r = corr(actual, model);
+  // FY2025-26 is scored on percentage increases, as in notebook 11 section 6;
+  // the request year on dollar adjustments, as in section 7's second test.
+  const r = req
+    ? corr(
+        rows.map((x) => x.moved),
+        rows.map((x) => x.board.actual - x.board.base),
+      )
+    : corr(actual, model);
   const rmse = Math.sqrt(
-    rows.reduce((s, x) => s + (x.pct - x.actualPct) ** 2, 0) / rows.length,
+    rows.reduce(
+      (s, x) =>
+        s +
+        (req
+          ? (x.moved - (x.board.actual - x.board.base)) ** 2
+          : (x.pct - x.actualPct) ** 2),
+      0,
+    ) / rows.length,
   );
   const moved = rows.reduce((s, x) => s + Math.max(x.moved, 0), 0);
   const pot = rows.reduce((t, y) => t + y.board.actual, 0);
@@ -334,17 +407,23 @@ function renderLab() {
     [
       "Moved between boards",
       money(moved, 2),
-      "vs a uniform increase; actual " + money(movedActual, 2),
+      req
+        ? "no new money; the request moves " + money(movedActual, 2)
+        : "vs a uniform increase; actual " + money(movedActual, 2),
     ],
     [
-      "Fit to actual " + shortFy(state.lab.meta.fiscalYear),
+      (req ? "Fit to the request " : "Fit to actual ") + labFy(Y.fiscalYear),
       isFinite(r) ? "r = " + r.toFixed(2) : "—",
-      "RMSE " + (rmse * 100).toFixed(2) + " pts",
+      req
+        ? "on dollar adjustments; RMSE " + money(rmse, 2)
+        : "RMSE " + (rmse * 100).toFixed(2) + " pts",
     ],
     [
-      "Range of increases",
+      req ? "Range of changes" : "Range of increases",
       pct(spread[0], 2) + " to " + pct(spread[1], 2),
-      "uniform increase " + pct(uniformPct(), 2),
+      req
+        ? "Step 2 re-divides a flat base"
+        : "uniform increase " + pct(uniformPct(), 2),
     ],
     [
       "Moved vs CDHE weights",
@@ -368,7 +447,7 @@ function renderLab() {
 }
 
 function uniformPct() {
-  const b = state.lab.boards;
+  const b = labBoards();
   return (
     b.reduce((s, x) => s + x.actual, 0) / b.reduce((s, x) => s + x.base, 0) - 1
   );
@@ -410,15 +489,19 @@ function renderLabChart(rows) {
   const primary = css("--color-primary");
   const text = css("--color-text");
   const u = uniformPct();
+  const Y = labYear();
+  const req = isRequest();
   document.getElementById("lab-legend").innerHTML = legendHtml([
-    { label: "Modeled increase", color: primary },
+    { label: req ? "Modeled change" : "Modeled increase", color: primary },
     {
-      label: "Actual FY2025-26 increase",
+      label: req
+        ? labFy(Y.fiscalYear) + " request"
+        : "Actual " + labFy(Y.fiscalYear) + " increase",
       color: text,
       cls: "legend__swatch--dot",
     },
     {
-      label: "Uniform increase",
+      label: req ? "No change" : "Uniform increase",
       color: css("--color-accent"),
       cls: "legend__swatch--dash",
     },
@@ -440,7 +523,7 @@ function renderLabChart(rows) {
         },
         {
           type: "line",
-          label: "Actual",
+          label: req ? "Request" : "Actual",
           data: sorted.map((x) => x.actualPct * 100),
           showLine: false,
           pointStyle: "rectRot",
@@ -459,7 +542,10 @@ function renderLabChart(rows) {
       layout: { padding: { top: 14 } },
       plugins: {
         legend: { display: false },
-        labUniform: { value: u * 100, label: "uniform " + pct(u, 2) },
+        labUniform: {
+          value: u * 100,
+          label: req ? "no new money" : "uniform " + pct(u, 2),
+        },
         tooltip: {
           ...base.tooltip,
           callbacks: {
@@ -471,20 +557,26 @@ function renderLabChart(rows) {
               c.dataset.label +
               " " +
               pct(c.raw / 100, 2) +
-              (c.datasetIndex === 0
-                ? " · " + signedMoney(sorted[c.dataIndex].moved) + " vs uniform"
-                : ""),
+              " · " +
+              signedMoney(
+                c.datasetIndex === 0
+                  ? sorted[c.dataIndex].moved
+                  : sorted[c.dataIndex].board.actual -
+                      sorted[c.dataIndex].prior *
+                        sorted.reduce((t, y) => t + y.board.actual, 0),
+              ) +
+              (req ? "" : " vs uniform"),
           },
         },
       },
       scales: {
         x: axis(
           base,
-          "Increase over FY2024-25 (%)",
+          (req ? "Change from " : "Increase over ") +
+            labFy(Y.baseYear) +
+            " (%)",
           (v) => v.toFixed(1) + "%",
-          {
-            suggestedMin: 0,
-          },
+          req ? {} : { suggestedMin: 0 },
         ),
         y: axis(base, null, null, { grid: { display: false } }),
       },
@@ -512,7 +604,9 @@ function dCell(d) {
 function renderLabTable(rows, ref) {
   const cols = LAB_ORDER.filter((m) => m !== "first_gen");
   document.querySelector("#lab-table thead").innerHTML =
-    '<tr><th>Board</th><th title="Share of FY2024-25 funding">Prior</th>' +
+    '<tr><th>Board</th><th title="Share of ' +
+    labFy(labYear().baseYear) +
+    ' funding">Prior</th>' +
     cols
       .map(
         (m) =>
@@ -528,7 +622,12 @@ function renderLabTable(rows, ref) {
           "</th>",
       )
       .join("") +
-    '<th>Modeled</th><th>Actual</th><th title="Dollars above or below a uniform increase">$ vs uniform</th><th title="Dollars relative to CDHE weights and full-time retention">vs CDHE</th></tr>';
+    "<th>Modeled</th><th>" +
+    (isRequest() ? "Request" : "Actual") +
+    (isRequest()
+      ? '</th><th title="Dollars above or below each board\'s prior share of a flat total">$ vs flat</th>'
+      : '</th><th title="Dollars above or below a uniform increase">$ vs uniform</th>') +
+    '<th title="Dollars relative to CDHE weights and full-time retention">vs CDHE</th></tr>';
   const order = rows
     .map((r, i) => [r, ref[i]])
     .sort((a, b) => b[0].pct - a[0].pct);
@@ -584,14 +683,36 @@ function renderReward() {
 
 function renderLabFoot() {
   const s = state.lab.meta.sources;
-  const w = state.lab.meta.windows;
+  const Y = labYear();
+  const w = Y.windows;
   const yrs = (m) => w[m][0] + "–" + w[m][3];
+  const fy = labFy(Y.fiscalYear);
+  const target = isRequest()
+    ? "Shares are applied to the flat " +
+      labFy(Y.baseYear) +
+      " base and compared with the request's Step 2 formula adjustments in the " +
+      link(s.jbcBriefing, "FY2026-27 JBC briefing") +
+      "; the fit is the correlation of dollar adjustments. With CDHE weights it is 0.63, and shifting every window back a year drops it to about zero."
+    : "Shares are applied to the actual " +
+      fy +
+      " total and compared with each board's " +
+      fy +
+      " appropriation (" +
+      link(s.jbcMemo, "JBC staff memo") +
+      ").";
+  const lag = Y.lagged.includes("pell_share")
+    ? " The Pell proxy uses " +
+      yrs("pell_share") +
+      ", one year behind the formula, because the next SFA file is not yet published."
+    : " The Pell proxy uses " + yrs("pell_share") + ".";
   document.getElementById("lab-foot").innerHTML =
     '<strong>How this works.</strong> For each metric, <span class="mono">D</span> is the four-year average divided by the average of its three oldest years. Each board\'s prior-year share is multiplied by <span class="mono">D</span> and renormalized, and the weighted sum is the Step 2 share (' +
     link(s.definitions, "CDHE data definitions") +
-    "). Shares are applied to the actual FY2025-26 total and compared with each board's FY2025-26 appropriation (" +
-    link(s.jbcMemo, "JBC staff memo") +
-    "). Windows: retention and graduation " +
+    "). " +
+    target +
+    " " +
+    fy +
+    " windows: retention and graduation " +
     yrs("retention") +
     ", URM " +
     yrs("urm_share") +
@@ -601,9 +722,9 @@ function renderLabFoot() {
     w.resident_fte[0].replace("FY ", "FY") +
     " to " +
     w.resident_fte[3].replace("FY ", "FY") +
-    ". The Pell proxy uses " +
-    yrs("pell_share") +
-    ", one year behind the formula, because the newest SFA file was not yet available when the notebook was built. First-generation status has no IPEDS equivalent and is held neutral: its weight goes to prior shares. Pell, URM and credentials are IPEDS proxies for state records, and the CCCS rates rest on six colleges (see the coverage panel below). Treat results as an approximation of the formula, not CDHE's calculation. The numbers come from " +
+    "." +
+    lag +
+    " First-generation status has no IPEDS equivalent and is held neutral: its weight goes to prior shares. Pell, URM and credentials are IPEDS proxies for state records, and the CCCS rates rest on the few colleges IPEDS still measures (see the coverage panel below). Treat results as an approximation of the formula, not CDHE's calculation. The numbers come from " +
     link(
       "https://github.com/Adele-Labrador/postsecondary-ds-book/blob/main/" +
         state.lab.meta.notebook,
@@ -702,7 +823,12 @@ function renderCovStats() {
     [
       "CCCS full-time retention cohort",
       int(n0) + " → " + int(n1),
-      "fall 2016 to fall 2022 starters, " + pct(n1 / n0 - 1, 0),
+      "fall " +
+        (L.meta.cohortYears[0] - 1) +
+        " to fall " +
+        (L.meta.cohortYears[L.meta.cohortYears.length - 1] - 1) +
+        " starters, " +
+        pct(n1 / n0 - 1, 0),
     ],
     [
       "CCCS part-time starters IPEDS still sees",
@@ -763,6 +889,8 @@ function renderCovSources() {
     "* Same IPEDS data except for eight CCCS colleges, whose rates CDHE computes from SURDS. Weights are HB 20-1366's, FY2021-22 to FY2026-27.";
 }
 
+const status = (u) => labYear().status[String(u.unitid)];
+
 function renderCovMatrix() {
   const L = state.lab;
   const units = L.units.filter(
@@ -801,7 +929,7 @@ function renderCovMatrix() {
         (cov.board === "ALL" ? "<td>" + u.board + "</td>" : "") +
         COV_COLS.map(([k]) => {
           const [label, cls] =
-            COV_STATUS[u.status[k]] || COV_STATUS["not reported"];
+            COV_STATUS[status(u)[k]] || COV_STATUS["not reported"];
           return (
             '<td><span class="cov__s ' + cls + '">' + label + "</span></td>"
           );
@@ -814,14 +942,16 @@ function renderCovMatrix() {
       );
     })
     .join("");
-  const used = units.filter((u) => u.status.retention === "used").length;
+  const used = units.filter((u) => status(u).retention === "used").length;
   document.getElementById("cov-matrix-h").textContent =
     (cov.board === "ALL" ? "All boards" : cov.board) +
     ": " +
     used +
     " of " +
     units.length +
-    " institutions usable for retention in the FY2025-26 window";
+    " institutions usable for retention in the " +
+    labFy(labYear().fiscalYear) +
+    " window";
 }
 
 function renderCovTrap() {
@@ -848,8 +978,15 @@ function renderCovTrap() {
   const c1 = css("--color-primary");
   const c2 = css("--ramp-2");
   document.getElementById("cov-trap-legend").innerHTML = legendHtml([
-    { label: "Six colleges used in the formula window", color: c1 },
-    { label: "Seven colleges IPEDS reclassified", color: c2 },
+    {
+      label:
+        vis.size +
+        " colleges used in the " +
+        labFy(L.cccs.fiscalYear) +
+        " window",
+      color: c1,
+    },
+    { label: cccsUnits().length - vis.size + " other colleges", color: c2 },
   ]);
   charts.covTrap = new Chart(document.getElementById("cov-trap"), {
     type: "bar",
@@ -994,7 +1131,11 @@ function renderCovFoot() {
     c.baselineGap.toFixed(4) +
     " in the data. Only the state's records can settle it. Retention cohorts are from " +
     link(s.ipeds, "IPEDS EF D files") +
-    ". Status describes the FY2025-26 window; credentials and enrollment shares are counts, so they survive reclassification.";
+    ". Status describes the " +
+    labFy(labYear().fiscalYear) +
+    " window, set by the year chosen in the formula lab; the part-time effect chart uses the " +
+    labFy(c.fiscalYear) +
+    " window. Credentials and enrollment shares are counts, so they survive reclassification.";
 }
 
 function renderCoverage() {

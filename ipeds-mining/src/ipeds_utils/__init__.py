@@ -9,6 +9,7 @@ fixed once rather than twelve times.
     )
 """
 
+from . import fetch as fetch_module  # the module; `fetch` below is the function
 from . import funding
 from .deidentify import coarsen, k_anonymity, suppress, synthetic_id
 from .dictionary import (
@@ -31,6 +32,8 @@ from .features import (
     tenure_density,
 )
 from .fetch import (
+    CURRENT_DATA_URL,
+    CURRENT_DICT_URL,
     DATA_URL,
     DICT_URL,
     FetchError,
@@ -77,6 +80,9 @@ __version__ = "1.2.0"
 
 __all__ = [
     "funding",
+    "fetch_module",
+    "CURRENT_DATA_URL",
+    "CURRENT_DICT_URL",
     "DATA_URL",
     "DICT_URL",
     "FetchError",

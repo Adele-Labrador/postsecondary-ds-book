@@ -2395,3 +2395,7 @@ select.input {
 .cov__sources td:nth-child(5) {
   text-align: left;
 }
+
+#lab-fy {
+  white-space: nowrap;
+}

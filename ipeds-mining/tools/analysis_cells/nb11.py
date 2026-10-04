@@ -16,7 +16,7 @@ CELLS = [
 
     | | |
     |---|---|
-    | Inputs | `EF{y}D`, `EF{y}A`, `GR{y}` (2017-2023), `SFA` (2016-17 to 2022-23), `C{y}_A` (2018-2024); board funding and resident FTE from `dashboard/data/colorado.json` in the parent repository |
+    | Inputs | `EF{y}D`, `EF{y}A`, `GR{y}` (2017-2024), `SFA` (2016-17 to 2023-24), `C{y}_A` (2018-2025); board funding and resident FTE from `dashboard/data/colorado.json` in the parent repository |
     | Unit | Governing board (the formula's unit); institutions are aggregated to boards |
     | Methods | Formula reconstruction, out-of-sample validation against appropriations, sensitivity analysis, counterfactual allocation, disaggregated completion gaps |
     | Outputs | `reports/funding/fy2025_26_reconstruction.csv`, `reports/figures/11_*.png`, `dashboard/data/colorado_formula.json` (parent repository) |
@@ -166,12 +166,14 @@ CELLS = [
 
 
     rows = []
-    for y in range(2017, 2024):
+    for y in range(2017, 2025):
         ef = load(f"EF{y}D", f"Fall {y}", ["UNITID", "RRFTCTA", "RET_NMF"])
         rows += [dict(UNITID=r.UNITID, metric="retention", year=y, num=r.RET_NMF, den=r.RRFTCTA)
                  for r in ef.itertuples()]
 
-        gr = load(f"GR{y}", rf"cohort year {y - 6} \(4-year\)", ["UNITID", "GRTYPE", "GRTOTLT"])
+        # GR2024's provisional dictionary title still says "cohort year 2017"; its
+        # overview sentence ("students who were enrolled in 2018") is the reliable anchor.
+        gr = load(f"GR{y}", rf"bachelor.{{0,40}}enrolled in {y - 6}", ["UNITID", "GRTYPE", "GRTOTLT"])
         gr = gr.pivot_table(index="UNITID", columns="GRTYPE", values="GRTOTLT", aggfunc="sum")
         for unitid, g in gr.iterrows():
             if pd.notna(g.get(8)):       # bachelor's subcohort at a four-year institution
@@ -192,7 +194,7 @@ CELLS = [
                       num=r.EFBKAAT + r.EFHISPT + r.EFAIANT, den=r.EFTOTLT - r.EFNRALT)
                  for r in ea.itertuples()]
 
-    for y in range(2016, 2024):  # SFA aid year y-(y+1) stands for fall y
+    for y in range(2016, 2025):  # SFA aid year y-(y+1) stands for fall y
         table = f"SFA{y % 100:02d}{(y + 1) % 100:02d}"
         try:
             sfa = load(table, f"{y}-{(y + 1) % 100:02d}", ["UNITID", "UPGRNTN", "SCUGRAD"])
@@ -202,7 +204,7 @@ CELLS = [
         rows += [dict(UNITID=r.UNITID, metric="pell_share", year=y, num=r.UPGRNTN, den=r.SCUGRAD)
                  for r in sfa.itertuples()]
 
-    for y in range(2018, 2025):
+    for y in range(2018, 2026):
         c = load(f"C{y}_A", f"July 1, {y - 1} and June 30, {y}",
                  ["UNITID", "CIPCODE", "MAJORNUM", "CTOTALT"])
         c = c[(c["CIPCODE"] == "99") & (c["MAJORNUM"] == 1)]
@@ -232,7 +234,7 @@ CELLS = [
     code(r"""
     totals = trap.sum()
     print(f"CCCS full-time retention cohort in IPEDS: {totals[2017]:,.0f} students (fall 2016 entrants) "
-          f"-> {totals[2023]:,.0f} (fall 2022 entrants)")
+          f"-> {totals[2023]:,.0f} (fall 2022 entrants) -> {totals[2024]:,.0f} (fall 2023 entrants)")
     """),
     md("""
     Front Range's retention cohort falls from about 1,100 students to zero, and Pikes
@@ -256,8 +258,9 @@ CELLS = [
     the GR2022 release, credentials through 2022-23) and states that the FY 2025-26
     graduation rates start from the fall 2017 cohort. FY 2025-26 is therefore fall 2020
     to fall 2023, which `F.formula_window` encodes. The prior share is each board's
-    share of FY 2024-25 funding. SFA 2023-24 is not yet published, so the Pell proxy
-    uses fall 2019 to fall 2022, one year behind the formula; the cell output flags this.
+    share of FY 2024-25 funding. SFA 2023-24, released on NCES's new download path in
+    2026, completes the Pell window, so every metric uses its documented years. The
+    2023 files are NCES's revised releases.
     """),
     code(r"""
     def board_d(fy_start, *, how="pooled", shift=0, drop=()):
@@ -319,14 +322,15 @@ CELLS = [
     result.round(2)
     """),
     md("""
-    The reconstruction tracks the pattern of actual increases (correlation 0.83, RMSE
-    0.50 points) using only public data, with half the weight measured by proxies. It
-    places MSU Denver first and Adams State last, as the Long Bill did. The two largest
-    errors point the same way: MSU's gain is overstated by about 0.6 points, and Adams
-    State's is understated by more than a point. Adams State's IPEDS graduation rates
+    The reconstruction tracks the pattern of actual increases (correlation 0.82, RMSE
+    0.45 points) using only public data, with half the weight measured by proxies. It
+    places MSU Denver first and Adams State last, as the Long Bill did. The largest
+    errors are at the three smallest boards, all understated: Fort Lewis by about 0.95
+    points, Adams State by 0.75 and Western by 0.5. MSU Denver's gain is overstated by
+    about 0.4. Small cohorts make IPEDS rates noisy. Adams State's graduation rates also
     fall sharply in the window (`D` about 0.96 for both), and its prior share includes
-    the FY 2024-25 Step 1 money. Either the SURDS metrics moved in its favour, or an
-    adjustment outside Step 2 is involved. The public data cannot say which.
+    the FY 2024-25 Step 1 money. Either the SURDS metrics moved in these boards' favour,
+    or an adjustment outside Step 2 is involved. The public data cannot say which.
 
     ### Is the fit an accident?
 
@@ -353,7 +357,7 @@ CELLS = [
     pd.DataFrame(rows).set_index("variant").round(2)
     """),
     md("""
-    Shifting the windows by one year drops the correlation from 0.83 to zero, so the
+    Shifting the windows by one year drops the correlation from 0.82 to zero, so the
     documented windows carry real information and the fit is not generic. Pooling
     counts and averaging rates give almost the same answer. Each proxy that is
     neutralised lowers the correlation, which suggests the proxies carry some of the
@@ -392,6 +396,52 @@ CELLS = [
     the whole base each year, but the prior-year share anchors almost all of it, and
     `D` ratios close to one move little. The result is stability, and a small
     incentive at the margin.
+
+    ### A second test: the FY 2026-27 request
+
+    The fall 2024 IPEDS files are now available, so the same code can rebuild
+    FY 2026-27, a year the reconstruction was not tuned on. The Long Bill adds no new
+    state funding that year, so Step 2 only re-divides the FY 2025-26 base. The test
+    compares the rebuilt reallocation with the request's \"Step 2 Formula Adjust\"
+    column from the [FY 2026-27 JBC briefing](https://content.leg.colorado.gov/sites/default/files/fy2026-27_hedbrf.pdf).
+    The prior share is each board's FY 2025-26 share. SFA 2024-25 is not yet
+    published, so the Pell proxy runs one year behind the formula; the cell output
+    flags this.
+    """),
+    code(r"""
+    T2 = 2026
+    base2 = fund[F.fiscal_year_label(T2 - 1)]
+    D2, notes2 = board_d(T2)
+    rebuilt = (F.step2_shares(base2, D2) - base2 / base2.sum()) * base2.sum()
+    D2_shift, _ = board_d(T2, shift=-1)
+    shifted = (F.step2_shares(base2, D2_shift) - base2 / base2.sum()) * base2.sum()
+
+    test2 = pd.DataFrame({"rebuilt ($)": rebuilt, "request ($)": request, "windows one year earlier ($)": shifted})
+    r2 = np.corrcoef(test2["rebuilt ($)"], test2["request ($)"])[0, 1]
+    r2_shift = np.corrcoef(test2["windows one year earlier ($)"], test2["request ($)"])[0, 1]
+    agree2 = int((np.sign(test2["rebuilt ($)"]) == np.sign(test2["request ($)"])).sum())
+    print(pd.Series(notes2).to_string())
+    print(f"correlation with the request {r2:.2f} (windows one year earlier: {r2_shift:.2f}); "
+          f"signs agree on {agree2} of 10 boards; moved ${rebuilt.clip(lower=0).sum():,.0f} rebuilt vs "
+          f"${request.clip(lower=0).sum():,.0f} requested")
+    test2.round(0)
+    """),
+    md("""
+    The rebuilt FY 2026-27 reallocation correlates 0.63 with the request, and the signs
+    agree on eight of ten boards. It moves $1.19 million between boards against the
+    request's $1.49 million. Shifting every window back a year destroys the fit
+    (correlation -0.05), as it did for FY 2025-26, so the documented windows carry the
+    signal in a year the model was not tuned on. The two sign misses are MSU Denver,
+    rebuilt to gain about $305,000 where the request takes $249,000, and UNC, a small
+    loss where the request gives a small gain. CU is close to zero here but gains
+    $385,000 in the request.
+
+    The fit is weaker than FY 2025-26's, for three visible reasons. Dollar adjustments
+    magnify small differences in `D` that percentage increases hide. The Pell window lags
+    a year. And Colorado Northwestern reports no full-time retention cohort for fall
+    2023, so only five CCCS colleges remain in the IPEDS retention window. The request
+    is also a request: the appropriation can differ, and CDHE can still revise the
+    SURDS inputs.
 
     ## 8. What is a retention point worth?
 
@@ -450,7 +500,7 @@ CELLS = [
     cols = ["UNITID", "GRTYPE", "GRTOTLT", "GRBKAAT", "GRHISPT", "GRAIANT", "GRNRALT", "GRUNKNT"]
     gap_rows = []
     for y in range(2017, 2024):
-        g = load(f"GR{y}", rf"cohort year {y - 6} \(4-year\)", cols)
+        g = load(f"GR{y}", rf"bachelor.{{0,40}}enrolled in {y - 6}", cols)
         g = g[g["GRTYPE"].isin([8, 12])].assign(board=lambda x: x["UNITID"].map(board_of))
         g = g[g["board"] != "CCCS"]
         g["URM"] = g["GRBKAAT"] + g["GRHISPT"] + g["GRAIANT"]
@@ -494,7 +544,7 @@ CELLS = [
     U.S. students. In the 2015-17 cohorts the gap is about 4 to 17 points, and the
     intervals for the small boards (Western, Mines, Adams State) are wide. Between the
     2011-13 and 2015-17 cohorts there is no common direction. Fort Lewis's gap widened
-    by about 9 points and Mines's narrowed by about 6. Most other changes are within
+    by about 9 points and Mines's narrowed by about 6.5. Most other changes are within
     the intervals.
 
     The comparison is descriptive, not a test of the formula. These cohorts entered
@@ -543,7 +593,7 @@ CELLS = [
     """),
     code(r"""
     rows = []
-    for y in range(2017, 2024):
+    for y in range(2017, 2025):
         ef = load(f"EF{y}D", f"Fall {y}", ["UNITID", "RRFTCTA", "RET_NMF", "RRPTCTA", "RET_NMP"])
         ef = ef.fillna({"RRPTCTA": 0, "RET_NMP": 0})
         rows += [dict(UNITID=r.UNITID, metric="retention_all", year=y, num=r.RET_NMF + r.RET_NMP,
@@ -708,15 +758,15 @@ CELLS = [
     colleges as reported adds only three colleges inside the window. Arapahoe's single
     fall 2019 cohort (1,075 starters, 46% retained) lands in the oldest year, and Red
     Rocks and Pueblo contribute a handful of bachelor's seekers. That is enough to flip
-    the CCCS estimate from -$46,590 to +$27,810. It is the reclassification artifact
+    the CCCS estimate from -$46,610 to +$27,790. It is the reclassification artifact
     from section 5 once more: a large, low-retention cohort that appears in the oldest
     year only raises `D` without any change in students' outcomes.
 
     Holding the seven invisible colleges flat fixes the composition at all thirteen,
     which pulls both `D` ratios toward one (full-time from 1.022 to 1.005). The
     inclusive ratio still sits below the full-time one, so CCCS still loses, about
-    $59,500. Dropping one visible college at a time gives anything from -$190,425
-    (without Aurora, the largest part-time cohort among the six) to +$32,587. The sign
+    $59,600. Dropping one visible college at a time gives anything from -$190,446
+    (without Aurora, the largest part-time cohort among the six) to +$32,568. The sign
     of the estimate depends on which single college is included.
 
     Reproducing the fiscal note's +$103,945 would need CCCS's inclusive `D` to sit
@@ -787,8 +837,9 @@ CELLS = [
     ## Takeaways
 
     - **The formula is reproducible from public data, roughly.** IPEDS plus CDHE's FTE
-      series recover the pattern of FY 2025-26 increases (correlation 0.83), and the
-      fit depends on using the documented windows.
+      series recover the pattern of FY 2025-26 increases (correlation 0.82) and of the
+      FY 2026-27 request, a year the model was not tuned on (0.63). Both fits depend on
+      using the documented windows.
     - **It moves little money.** About $1.1 million of $1.25 billion in FY 2025-26, and
       about $1.5 million in the FY 2026-27 request. The incentive at the margin is small.
     - **Performance is relative and front-loaded.** A board gains by improving faster than
@@ -813,8 +864,8 @@ CELLS = [
        Colorado residents. Does the reconstruction improve?
     4. Compute section 9's gaps for Pell recipients with `GR{y}_PELL_SSL`. Is the Pell gap
        larger or smaller than the URM gap on each board?
-    5. When the 2024 IPEDS files are published, reconstruct FY 2026-27 and compare it
-       with the request's Step 2 adjustments in section 7.
+    5. When SFA 2024-25 is published, rerun section 7's FY 2026-27 test with the Pell
+       window caught up. Does the fit improve, and do MSU Denver and UNC change sign?
     6. Repeat section 10c with two and three new-definition years in the window. How
        long does a splice keep distorting `D`, and does the distortion change sign?
     7. Section 10c holds the invisible CCCS colleges flat. Replace that assumption with
@@ -828,29 +879,14 @@ CELLS = [
     The Colorado panel's formula lab and coverage panel read the objects built above,
     so the dashboard and this notebook cannot disagree. The cell writes
     `dashboard/data/colorado_formula.json` when the notebook runs inside the parent
-    repository and checks that the exported window series reproduce the section 6
-    `D` ratios exactly.
+    repository and checks that the exported window series reproduce the `D` ratios
+    of section 6 (FY 2025-26) and section 7's second test (FY 2026-27) exactly.
     """),
     code(r"""
     import datetime as dt
 
     LAB = ["retention", "grad100", "grad150", "urm_share", "pell_share", "credentials"]
-    ret_years = F.formula_window(T, "retention")
-    windows, series, reporters = {}, {}, {}
-    for m in LAB:
-        sub = panel[panel["metric"] == m]
-        yrs = F.formula_window(T, m)
-        if yrs[-1] > sub["year"].max():
-            yrs = [y - 1 for y in yrs]
-        windows[m] = yrs
-        series[m] = F.board_series(sub, yrs)
-        keep = F.consistent_reporters(sub, yrs)
-        reporters[m] = sub[sub["UNITID"].isin(keep)].groupby("board")["UNITID"].nunique()
-        assert (series[m].apply(F.d_ratio, axis=1) - D[m]).abs().max() < 1e-12, m
-    fte_years = [F.fiscal_year_label(y) for y in F.formula_window(T, "resident_fte")]
-    series["resident_fte"] = fte.loc[fund.index, fte_years]
-    windows["resident_fte"] = fte_years
-    incl = F.board_series(inclusive, ret_years)
+    COHORT_YEARS = list(range(2017, 2025))
 
 
     def status(sub, unitid, yrs):
@@ -866,30 +902,69 @@ CELLS = [
         return "zero cohort"
 
 
-    cov_metrics = {"retention": panel[panel["metric"] == "retention"], "retention_all": inclusive,
-                   **{m: panel[panel["metric"] == m] for m in LAB[1:]}}
-    cov_windows = {"retention_all": ret_years, **windows}
-    ft_den = cov_metrics["retention"].pivot_table(index="UNITID", columns="year", values="den")
+    def num(v, places=6):
+        return None if pd.isna(v) else round(float(v), places)
+
+
+    def export_year(fy_start, d_check, target, target_kind, pct_check):
+        # Window series for one fiscal year, checked against the D used in the notebook.
+        ret_years = F.formula_window(fy_start, "retention")
+        windows, series, reporters, lagged = {}, {}, {}, []
+        for m in LAB:
+            sub = panel[panel["metric"] == m]
+            yrs = F.formula_window(fy_start, m)
+            if yrs[-1] > sub["year"].max():
+                yrs = [y - 1 for y in yrs]
+                lagged.append(m)
+            windows[m] = yrs
+            series[m] = F.board_series(sub, yrs)
+            keep = F.consistent_reporters(sub, yrs)
+            reporters[m] = sub[sub["UNITID"].isin(keep)].groupby("board")["UNITID"].nunique()
+            assert (series[m].apply(F.d_ratio, axis=1) - d_check[m]).abs().max() < 1e-12, (fy_start, m)
+        fte_years = [F.fiscal_year_label(y) for y in F.formula_window(fy_start, "resident_fte")]
+        series["resident_fte"] = fte.loc[fund.index, fte_years]
+        windows["resident_fte"] = fte_years
+        incl = F.board_series(inclusive, ret_years)
+        cov_metrics = {"retention": panel[panel["metric"] == "retention"], "retention_all": inclusive,
+                       **{m: panel[panel["metric"] == m] for m in LAB[1:]}}
+        cov_windows = {"retention_all": ret_years, **windows}
+        base_fy = fund[F.fiscal_year_label(fy_start - 1)]
+        return {
+            "fiscalYear": F.fiscal_year_label(fy_start), "baseYear": F.fiscal_year_label(fy_start - 1),
+            "target": target_kind, "windows": {m: [str(y) for y in w] for m, w in windows.items()},
+            "lagged": lagged, "retentionYears": ret_years,
+            "boards": {b: {
+                "base": float(base_fy[b]), "target": float(target[b]),
+                "series": {m: [num(v) for v in series[m].loc[b]] for m in series},
+                "retentionInclusive": [num(v) for v in incl.loc[b]],
+                "reporters": {m: int(reporters[m].get(b, 0)) for m in LAB},
+                "notebookPct": num(pct_check[b], 4),
+            } for b in fund.index},
+            "status": {str(int(u)): {m: status(sub, u, cov_windows[m]) for m, sub in cov_metrics.items()}
+                       for u in board_of.index},
+        }
+
+
+    years_out = [
+        export_year(T, D, fund[F.fiscal_year_label(T)], "actual", pred),
+        export_year(T2, D2, base2 + request.reindex(base2.index), "request", rebuilt / base2 * 100),
+    ]
+
+    ft_den = panel[panel["metric"] == "retention"].pivot_table(index="UNITID", columns="year", values="den")
     all_den = inclusive.pivot_table(index="UNITID", columns="year", values="den")
     units = []
     for u, b in sorted(board_of.items(), key=lambda kv: (kv[1], str(instnm.get(kv[0], kv[0])))):
         units.append({
             "unitid": int(u), "name": instnm.get(u, str(u)), "board": b,
-            "status": {m: status(sub, u, cov_windows[m]) for m, sub in cov_metrics.items()},
-            "ftCohort": [None if pd.isna(v) else int(v) for v in ft_den.reindex(index=[u], columns=range(2017, 2024)).iloc[0]],
-            "allCohort": [None if pd.isna(v) else int(v) for v in all_den.reindex(index=[u], columns=range(2017, 2024)).iloc[0]],
+            "ftCohort": [None if pd.isna(v) else int(v) for v in ft_den.reindex(index=[u], columns=COHORT_YEARS).iloc[0]],
+            "allCohort": [None if pd.isna(v) else int(v) for v in all_den.reindex(index=[u], columns=COHORT_YEARS).iloc[0]],
         })
-
-    def num(v, places=6):
-        return None if pd.isna(v) else round(float(v), places)
 
     lab = {
         "meta": {
-            "built": dt.date.today().isoformat(), "fiscalYear": F.fiscal_year_label(T),
-            "baseYear": F.fiscal_year_label(T - 1), "notebook": "ipeds-mining/notebooks/" + "11_colorado_performance_funding.ipynb",
-            "windows": {m: [str(y) for y in w] for m, w in windows.items()},
-            "retentionYears": ret_years, "cohortYears": list(range(2017, 2024)),
-            "fiscalNoteBase": FISCAL_NOTE_BASE,
+            "built": dt.date.today().isoformat(),
+            "notebook": "ipeds-mining/notebooks/" + "11_colorado_performance_funding.ipynb",
+            "cohortYears": COHORT_YEARS, "fiscalNoteBase": FISCAL_NOTE_BASE,
             "sources": {
                 "definitions": "https://cdhe.colorado.gov/sites/highered/files/Colorado_Performance_Funding_Overview_and_Data_Definitions_2025_26_1.pdf",
                 "jbcMemo": "https://content.leg.colorado.gov/sites/default/files/hedainfo-09-09-2025.pdf",
@@ -901,18 +976,12 @@ CELLS = [
         },
         "weights": F.WEIGHTS,
         "metrics": {m: F.METRICS[m] for m in F.WEIGHTS},
-        "boards": [{
-            "id": b, "name": names[b], "base": float(fund.loc[b, F.fiscal_year_label(T - 1)]),
-            "actual": float(fund.loc[b, F.fiscal_year_label(T)]),
-            "series": {m: [num(v) for v in series[m].loc[b]] for m in series},
-            "retentionInclusive": [num(v) for v in incl.loc[b]],
-            "reporters": {m: int(reporters[m].get(b, 0)) for m in LAB},
-            "fiscalNote": {k: int(fiscal_note.loc[b, k]) for k in fiscal_note},
-            "request2627": int(request[b]),
-            "notebookPct": num(pred[b], 4),
-        } for b in fund.index],
+        "boards": [{"id": b, "name": names[b], "fiscalNote": {k: int(fiscal_note.loc[b, k]) for k in fiscal_note}}
+                   for b in fund.index],
+        "years": years_out,
         "units": units,
         "cccs": {
+            "fiscalYear": F.fiscal_year_label(T),
             "sensitivity": [{"variant": k, **{c: num(v, 4) for c, v in r.items()}} for k, r in sensitivity.iterrows()],
             "neededGap": num(needed - d_ft0, 4), "baselineGap": num(sensitivity.iloc[0]["D gap"], 4),
             "visibleShareFt": num(fall16[visible].sum() / fall16.sum(), 4),
@@ -924,7 +993,8 @@ CELLS = [
     out = Path("../../dashboard/data")
     if out.is_dir():
         (out / "colorado_formula.json").write_text(json.dumps(lab, separators=(",", ":")) + "\n")
-        print(f"wrote {out / 'colorado_formula.json'}: {len(lab['boards'])} boards, {len(units)} IPEDS units")
+        print(f"wrote {out / 'colorado_formula.json'}: {len(lab['boards'])} boards, "
+              f"{', '.join(y['fiscalYear'] for y in years_out)}, {len(units)} IPEDS units")
     else:
         print("not inside the parent repository; skipped the dashboard export")
     """),

@@ -119,6 +119,41 @@ def test_imputation_partner_naming():
     assert iu.imputation_partner("ret_pcf") == "XRET_PCF"
 
 
+# --- Download fallback (offline) -------------------------------------------------
+
+
+def test_fetch_tries_current_path_then_legacy(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_get(url, timeout=None):
+        calls.append(url)
+        if "complete-data-files" in url and "_Dict" not in url:
+            return b"PK current"
+        if "datacenter/data" in url and "_Dict" in url:
+            return b"PK legacy dict"
+        raise iu.FetchError(f"HTTP 404 for {url}")
+
+    monkeypatch.setattr(iu.fetch_module, "_get", fake_get)
+    record = iu.fetch("EF2024D", raw_dir=tmp_path)
+    assert record["data_url"] == iu.CURRENT_DATA_URL.format(table="EF2024D")
+    assert record["dict_url"] == iu.DICT_URL.format(table="EF2024D")
+    assert (tmp_path / "EF2024D.zip").read_bytes() == b"PK current"
+    assert (tmp_path / "EF2024D_Dict.zip").read_bytes() == b"PK legacy dict"
+
+    calls.clear()
+    iu.fetch("EF2024D", raw_dir=tmp_path)  # cached: no network
+    assert calls == []
+
+
+def test_fetch_raises_when_no_path_has_the_table(tmp_path, monkeypatch):
+    def missing(url, timeout=None):
+        raise iu.FetchError(f"HTTP 404 for {url}")
+
+    monkeypatch.setattr(iu.fetch_module, "_get", missing)
+    with pytest.raises(iu.FetchError, match="complete-data-files.*datacenter"):
+        iu.fetch("XX2099", raw_dir=tmp_path)
+
+
 # --- Network-dependent behaviour ------------------------------------------------
 
 

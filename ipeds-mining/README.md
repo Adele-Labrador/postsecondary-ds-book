@@ -124,7 +124,7 @@ writing, so a syntax error fails the build rather than the reader.
 | `08_classification_completion_risk` | Ch. 10 | Which institutions complete above their sector median? | Institution-level only. Boosting AUC 0.81. Dropping the Pell features does not fix subgroup errors |
 | `09_longitudinal_panel_models` | Ch. 11 | Did pandemic-era cohorts retain worse? | Public 4-year dip of 2 points for the fall-2020 cohort, recovered by fall 2022. Public 2-year above pre-pandemic by fall 2022 |
 | `10_benchmarking_scorecards` | Ch. 12 | Where does a focal institution stand among peers? | Median 90% rank interval under random weights spans 100 of 207 places |
-| `11_colorado_performance_funding` | Ch. 13 | Can Colorado's HB 20-1366 Step 2 allocation be rebuilt from public data, and what does it reward? | Reconstruction correlates 0.83 with actual FY 2025-26 board increases (0 with windows shifted a year). Performance moved $1.11M of $1.25B (0.09%) against a uniform 2.5%. Under HB 26-1345, the fiscal note's definition changes move $1.41M, and splicing old and new retention definitions in one window would move $0.98M. Its appendix writes the dashboard's funding formula lab data |
+| `11_colorado_performance_funding` | Ch. 13 | Can Colorado's HB 20-1366 Step 2 allocation be rebuilt from public data, and what does it reward? | Reconstruction correlates 0.82 with actual FY 2025-26 board increases and 0.63 with the FY 2026-27 request's adjustments (about 0 for both with windows shifted a year). Performance moved $1.11M of $1.25B (0.09%) against a uniform 2.5%. Under HB 26-1345, the fiscal note's definition changes move $1.41M, and splicing old and new retention definitions in one window would move $0.98M. Its appendix writes the dashboard's funding formula lab data |
 
 Notebook 11 is self-contained: it reads `../../dashboard/data/colorado.json` from the parent
 repository (or downloads it from GitHub) and fetches its own IPEDS files, so it does not
@@ -191,7 +191,7 @@ Each of these produced plausible-looking wrong numbers until a check caught it.
   awarding bachelor's degrees, IPEDS treats it as four-year: its retention cohort becomes
   bachelor's seekers only, and the bachelor's GR subcohort replaces the two-year cohort.
   The CCCS full-time retention cohort in IPEDS fell from 5,384 (fall 2016 entrants) to 1,207
-  (fall 2022). Front Range went from 1,099 to 0. `iu.funding.consistent_reporters` keeps an
+  (fall 2022) and 1,223 (fall 2023). Front Range went from 1,099 to 0. `iu.funding.consistent_reporters` keeps an
   institution only if it reports under one definition, with a positive cohort, in every
   window year.
 - **GR mixes two cohorts in one file.** `GR2023` describes 2017 entrants at four-year
@@ -199,6 +199,16 @@ Each of these produced plausible-looking wrong numbers until a check caught it.
   mid-panel therefore jumps three cohort years. Assert the cohort year from the dictionary
   (`cohort year 2017 \(4-year\)`). `assert_reference_period` takes a regular expression, so
   parentheses must be escaped.
+- **GR2024's dictionary title is stale.** The provisional `GR2024` dictionary is titled
+  "cohort year 2017 (4-year) and cohort year 2020 (2-year)", the same as `GR2023`, but its
+  overview counts "bachelor degree-seeking students who were enrolled in 2018" and the
+  counts differ from `GR2023` in 95% of rows. Notebook 11 anchors on the overview sentence
+  (`bachelor.{0,40}enrolled in 2018`), which matches every year from `GR2017`.
+- **NCES moved the files in 2026.** Recent releases (2023 onward, plus the newest revised
+  2022-23 aid file) live at `https://nces.ed.gov/ipeds/complete-data-files/`; older years
+  remain at `datacenter/data/`, which serves original releases without later revisions.
+  `iu.fetch` tries the new path first and records the URL that answered. A cached archive
+  is reused, so pass `refresh=True` to pick up a revision.
 
 ## Design decisions worth knowing
 

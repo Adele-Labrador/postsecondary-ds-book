@@ -1,0 +1,50 @@
+[
+  {
+    "data_bytes": 9294160,
+    "data_path": "../data/raw/C2023_A.zip",
+    "data_sha256": "651d95b6405bb86c6c14884ed54225a27492199d21d8acd63cda2581aa60838a",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/C2023_A.zip",
+    "dict_bytes": 115320,
+    "dict_path": "../data/raw/C2023_A_Dict.zip",
+    "dict_sha256": "2738d0a2675f475e1c2bc92a63e7cea92b3caf5210d80f19eaf6a5523919f2e2",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/C2023_A_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:19+00:00",
+    "table": "C2023_A"
+  },
+  {
+    "data_bytes": 500322,
+    "data_path": "../data/raw/C2023_B.zip",
+    "data_sha256": "a901a43fa4ae1dc7e1fb061eaef9244ce34c157e1dac7cd534695f01464f7830",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/C2023_B.zip",
+    "dict_bytes": 16059,
+    "dict_path": "../data/raw/C2023_B_Dict.zip",
+    "dict_sha256": "ba0382f2c04fdaaef57c13edc102daa3e2ad08fd28c8800bd30ccc04080f1e97",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/C2023_B_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:19+00:00",
+    "table": "C2023_B"
+  },
+  {
+    "data_bytes": 748858,
+    "data_path": "../data/raw/C2023_C.zip",
+    "data_sha256": "6e5d545569413b691582e71d2f2f76cc43aec1b28ecb4ef591d4b096829fcc76",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/C2023_C.zip",
+    "dict_bytes": 14446,
+    "dict_path": "../data/raw/C2023_C_Dict.zip",
+    "dict_sha256": "27809fbed1c4a756d99c7e57ef631799c13840a9c186db491a3084f34848122f",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/C2023_C_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:19+00:00",
+    "table": "C2023_C"
+  },
+  {
+    "data_bytes": 82029,
+    "data_path": "../data/raw/DRVC2023.zip",
+    "data_sha256": "1d90bbe5010c2e3cc5c295b5cb1224bd0f44606dc9696af9faf4b559b399ba02",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/DRVC2023.zip",
+    "dict_bytes": 16389,
+    "dict_path": "../data/raw/DRVC2023_Dict.zip",
+    "dict_sha256": "54d4f1a3ebc26ae75ce346522dc1b4743e72c817672e55c843ff49fd78236a78",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/DRVC2023_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:19+00:00",
+    "table": "DRVC2023"
+  }
+]

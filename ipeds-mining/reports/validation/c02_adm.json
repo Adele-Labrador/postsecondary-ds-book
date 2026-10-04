@@ -1,0 +1,43 @@
+{
+  "table": "c02_adm",
+  "rows": 1972,
+  "results": [
+    {
+      "name": "unique_key(UNITID)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Declared grain must be unique",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(APPLCN,0,None)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "admitted_le_applied",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Admits cannot exceed applicants",
+      "status": "pass"
+    },
+    {
+      "name": "enrolled_le_admitted",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Enrolled cannot exceed admits",
+      "status": "pass"
+    }
+  ],
+  "generated_utc": "2026-09-24T17:19:11+00:00"
+}

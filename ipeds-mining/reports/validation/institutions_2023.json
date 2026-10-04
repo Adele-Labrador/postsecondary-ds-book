@@ -1,0 +1,87 @@
+{
+  "table": "institutions_2023",
+  "rows": 5988,
+  "results": [
+    {
+      "name": "unique_key(UNITID)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Declared grain must be unique",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(RET_PCF,0,100)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(BA_RATE_150,0,1)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(INSTR_FTE_SHARE,0,1)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(TENURE_DENSITY,0,1)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(INSTR_EXP_SHARE,0,1)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(TUITION_SHARE,0,1)",
+      "severity": "warn",
+      "n_offending": 12,
+      "share": 0.002,
+      "sample_unitids": [
+        "118198",
+        "122296",
+        "146533",
+        "191597",
+        "218751"
+      ],
+      "note": "Value plausibility bound",
+      "status": "fail"
+    },
+    {
+      "name": "fall_headcount_EF2023A_vs_DRVEF2023",
+      "severity": "warn",
+      "n_offending": 1,
+      "share": 0.00017,
+      "sample_unitids": [
+        "160621"
+      ],
+      "note": "EF2023A all-student total should equal DRVEF2023 ENRTOT",
+      "status": "fail"
+    }
+  ],
+  "generated_utc": "2026-09-24T17:26:26+00:00"
+}

@@ -1,0 +1,11 @@
+indicator,role,direction,focal value,peer median,peer 25th,peer 75th,peer percentile,oriented z,peers reporting,source and caveat
+Full-time first-year retention (%),scored,higher is better,71.0,91.0,85.0,95.0,2.912621359223301,-2.697963037906381,206,EF2023D; fall-2022 cohort
+Bachelor's completion within 150%,scored,higher is better,0.4805350271029102,0.8344685720544144,0.6882180830602765,0.9041410728317462,3.3980582524271843,-2.699542604691636,206,"GR200_23, 2015 cohort; empirical-Bayes shrunk"
+"Any award within 8 years, all entrants (%)",scored,higher is better,50.0,84.0,71.0,91.0,3.3816425120772946,-2.5480762024671373,207,DRVOM2023; includes part-time and transfer-in students
+Pell minus non-Pell 8-year award rate (points),scored,higher is better,1.0,-5.0,-11.0,-1.0,87.74509803921569,0.8093889113719143,204,DRVOM2023; higher means a smaller Pell deficit
+Instruction share of core expenses,scored,higher is better,0.229484510294313,0.2827202849282066,0.2270390714487585,0.34035477089680544,27.312775330396477,-0.6249506119270639,227,F1/F2/F3; GASB and FASB categories differ
+Published in-state tuition and fees 2023-24 ($),scored,lower is better,10017.0,21086.0,12003.75,63410.5,16.019417475728158,0.5748778175595928,206,"IC2023_AY; sticker price, not net price"
+Women's to men's average salary,flag,none,0.9181803967735706,0.8474497200912295,0.8126672766980614,0.8988258552260824,79.73568281938326,1.1905259445812804,227,"SAL2023_IS; unadjusted for rank and field, reported as distance from parity"
+Student-faculty ratio,context,none,16.0,12.0,8.5,17.0,65.63876651982379,0.6744907594765952,227,EF2023D
+Core expenses per FTE student ($),context,none,189905.77251070502,84366.7484047402,56399.403680609554,155892.10460303526,82.37885462555066,2.108394513352636,227,Includes medical and research spending where reported
+Library expenditure per FTE ($),context,none,988.0,1132.0,729.0,1755.5,42.600896860986545,-0.20932471845825368,223,AL2023; blank when attributed from a parent

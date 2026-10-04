@@ -1,0 +1,34 @@
+{
+  "table": "c07_gr200",
+  "rows": 4954,
+  "results": [
+    {
+      "name": "unique_key(UNITID)",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Declared grain must be unique",
+      "status": "pass"
+    },
+    {
+      "name": "in_range(BAGR200,0,100)",
+      "severity": "warn",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "Value plausibility bound",
+      "status": "pass"
+    },
+    {
+      "name": "monotone_200_ge_150",
+      "severity": "error",
+      "n_offending": 0,
+      "share": 0.0,
+      "sample_unitids": [],
+      "note": "200% rate cannot fall below the 150% rate",
+      "status": "pass"
+    }
+  ],
+  "generated_utc": "2026-09-24T17:19:26+00:00"
+}

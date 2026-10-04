@@ -1,0 +1,26 @@
+[
+  {
+    "data_bytes": 266290,
+    "data_path": "../data/raw/AL2023.zip",
+    "data_sha256": "596f1330af705ade77363aa77b714a894470f1570550a74e2adb424793833fe0",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/AL2023.zip",
+    "dict_bytes": 25000,
+    "dict_path": "../data/raw/AL2023_Dict.zip",
+    "dict_sha256": "8a2ea8000c6cd3f9d90273f8cf0924c045f525aeeff27b55db437d7264a0ff62",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/AL2023_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:39+00:00",
+    "table": "AL2023"
+  },
+  {
+    "data_bytes": 74351,
+    "data_path": "../data/raw/DRVAL2023.zip",
+    "data_sha256": "40f9f8cd05566885fee8d1988b6914dfdb1a4329a12b77e5d3fd1dcf77506a3d",
+    "data_url": "https://nces.ed.gov/ipeds/datacenter/data/DRVAL2023.zip",
+    "dict_bytes": 19143,
+    "dict_path": "../data/raw/DRVAL2023_Dict.zip",
+    "dict_sha256": "14649be162c5214a15d06c652621dc85e75ea9231894edd40000389e447ae19d",
+    "dict_url": "https://nces.ed.gov/ipeds/datacenter/data/DRVAL2023_Dict.zip",
+    "retrieved_utc": "2026-09-24T17:19:39+00:00",
+    "table": "DRVAL2023"
+  }
+]

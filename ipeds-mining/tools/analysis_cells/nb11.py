@@ -263,14 +263,15 @@ CELLS = [
     2023 files are NCES's revised releases.
     """),
     code(r"""
-    def board_d(fy_start, *, how="pooled", shift=0, drop=()):
+    def board_d(fy_start, *, how="pooled", shift=0, drop=(), data=None):
+        data = panel if data is None else data
         d = pd.DataFrame(index=fund.index)
         notes = {}
         for metric in ["retention", "grad100", "grad150", "urm_share", "pell_share", "credentials"]:
             if metric in drop:
                 continue
             years = [y + shift for y in F.formula_window(fy_start, metric)]
-            sub = panel[panel["metric"] == metric]
+            sub = data[data["metric"] == metric]
             if years[-1] > sub["year"].max():           # newest year not yet published
                 years = [y - 1 for y in years]
                 notes[metric] = f"window shifted back to {years[0]}-{years[-1]}"
@@ -442,6 +443,189 @@ CELLS = [
     2023, so only five CCCS colleges remain in the IPEDS retention window. The request
     is also a request: the appropriation can differ, and CDHE can still revise the
     SURDS inputs.
+
+    ### How strong is the fit?
+
+    Ten boards is a small sample, so a correlation of 0.6 or 0.8 could arise by chance,
+    and a single board can carry it. The cells below give five checks for both years:
+
+    1. **Exact permutation test.** Every one of the 10! = 3,628,800 ways of assigning
+       the actual (or requested) changes to boards, counting how often the correlation
+       is at least as high as observed. This needs no distributional assumption.
+    2. **Confidence intervals** for the correlation: Fisher's z, and a percentile
+       bootstrap that resamples boards. With n = 10 both are wide, and the bootstrap
+       is only a rough guide.
+    3. **Leave one board out**, to see whether any single board makes the fit.
+    4. **Placebo windows.** The same formula run on windows one, two and three years
+       too early. If the fit is real, the documented windows should beat all of them.
+    5. **Cohort noise.** Retention and graduation rates come from finite cohorts, so
+       a board's rate would vary from cohort to cohort even if nothing changed. The
+       simulation redraws every institution-year's retained and graduated counts as
+       binomial with the observed rate and rebuilds the reconstruction 2,000 times.
+       The enrollment shares, credentials and FTE are administrative counts and are
+       held fixed. The result is an interval for each board's predicted change.
+    """),
+    code(r"""
+    from itertools import islice, permutations
+
+    base25 = fund[F.fiscal_year_label(T - 1)]
+    target25 = actual.reindex(fund.index)
+    target26 = request.reindex(fund.index).astype(float)
+
+
+    def fit25(d):
+        return (F.step2_shares(base25, d) * fund[F.fiscal_year_label(T)].sum() / base25 - 1) * 100
+
+
+    def fit26(d):
+        return (F.step2_shares(base2, d) - base2 / base2.sum()) * base2.sum()
+
+
+    def r_of(x, y):
+        return float(np.corrcoef(x, y)[0, 1])
+
+
+    def exact_perm_p(x, y, chunk=400_000):
+        # Share of all 10! board assignments with a correlation at least as high.
+        x = (x - x.mean()) / x.std(ddof=0)
+        y = np.asarray((y - y.mean()) / y.std(ddof=0))
+        obs = float(x @ y) / len(x)
+        hits = total = 0
+        perms = permutations(range(len(y)))
+        while True:
+            block = np.fromiter((i for p in islice(perms, chunk) for i in p), dtype=np.int8)
+            if block.size == 0:
+                break
+            r = (y[block.reshape(-1, len(y))] @ np.asarray(x)) / len(x)
+            hits += int((r >= obs - 1e-12).sum())
+            total += len(r)
+        return hits / total, total
+
+
+    rng = np.random.default_rng(1366)
+    years_fit = {
+        "FY 2025-26 vs actual": (fit25(D), target25, fit25, T),
+        "FY 2026-27 vs request": (fit26(D2), target26, fit26, T2),
+    }
+    rows = []
+    for label, (pred_x, y, fn, fy) in years_fit.items():
+        r = r_of(pred_x, y)
+        p_perm, n_perm = exact_perm_p(pred_x, y)
+        z, se = np.arctanh(r), 1 / np.sqrt(len(y) - 3)
+        boot = []
+        for _ in range(10_000):
+            idx = rng.integers(0, len(y), len(y))
+            if np.unique(idx).size > 2:
+                boot.append(r_of(pred_x.iloc[idx], y.iloc[idx]))
+        loo = [r_of(pred_x.drop(b), y.drop(b)) for b in y.index]
+        placebo = [r_of(fn(board_d(fy, shift=-k)[0]), y) for k in (1, 2, 3)]
+        rows.append({
+            "fit": label, "r": r, "exact permutation p": p_perm,
+            "Fisher 95% CI": f"{np.tanh(z - 1.96 * se):.2f} to {np.tanh(z + 1.96 * se):.2f}",
+            "bootstrap 95% CI": f"{np.percentile(boot, 2.5):.2f} to {np.percentile(boot, 97.5):.2f}",
+            "leave-one-out r": f"{min(loo):.2f} to {max(loo):.2f} (without {y.index[int(np.argmin(loo))]}: lowest)",
+            "placebo r (1, 2, 3 yrs early)": ", ".join(f"{v:.2f}" for v in placebo),
+        })
+    print(f"permutations checked per year: {n_perm:,}")
+    strength = pd.DataFrame(rows).set_index("fit")
+    strength.round(4).T
+    """),
+    code(r"""
+    RATES = ["retention", "grad100", "grad150"]
+    boards_idx = {b: k for k, b in enumerate(fund.index)}
+
+
+    def rate_spec(fy, metric):
+        # Rows a board's pooled rate uses (consistent reporters, window years), with
+        # a board-by-year group id. Redrawing counts never changes a cohort size or a
+        # reporter, so the grouping is fixed across draws.
+        sub = panel[panel["metric"] == metric]
+        yrs = F.formula_window(fy, metric)
+        rows = sub[sub["UNITID"].isin(F.consistent_reporters(sub, yrs)) & sub["year"].isin(yrs)]
+        group = rows["board"].map(boards_idx).to_numpy() * 4 + rows["year"].map({y: k for k, y in enumerate(yrs)}).to_numpy()
+        den = np.bincount(group, rows["den"].to_numpy(dtype=float), minlength=4 * len(fund))
+        return rows.index.to_numpy(), group, den
+
+
+    rate_rows = panel[panel["metric"].isin(RATES) & (panel["den"] > 0) & panel["num"].notna()]
+    n_obs = rate_rows["den"].astype(int).to_numpy()
+    p_obs = (rate_rows["num"] / rate_rows["den"]).clip(0, 1).to_numpy(dtype=float)
+    pos = pd.Series(np.arange(len(rate_rows)), index=rate_rows.index)
+    specs = {(fy, m): rate_spec(fy, m) for fy in (T, T2) for m in RATES}
+
+
+    def rate_d(d_obs, fy, nums):
+        d = d_obs.copy()
+        for metric in RATES:
+            idx, group, den = specs[(fy, metric)]
+            num = np.bincount(group, nums[pos[idx].to_numpy()], minlength=den.size)
+            rate = (num / den).reshape(len(fund), 4)
+            d[metric] = rate.mean(axis=1) / rate[:, :3].mean(axis=1)
+        return d
+
+
+    # The fast path must reproduce the notebook's D exactly before any simulation.
+    obs_nums = rate_rows["num"].to_numpy(dtype=float)
+    assert np.allclose(rate_d(D, T, obs_nums), D) and np.allclose(rate_d(D2, T2, obs_nums), D2)
+
+    sims25, sims26, r25, r26 = [], [], [], []
+    for _ in range(2_000):
+        nums = rng.binomial(n_obs, p_obs).astype(float)
+        p25 = fit25(rate_d(D, T, nums))
+        p26 = fit26(rate_d(D2, T2, nums))
+        sims25.append(p25)
+        sims26.append(p26)
+        r25.append(r_of(p25, target25))
+        r26.append(r_of(p26, target26))
+    sims25, sims26 = pd.DataFrame(sims25), pd.DataFrame(sims26)
+
+    noise = pd.DataFrame({
+        "actual %": target25,
+        "predicted %": fit25(D),
+        "cohort-noise 95% interval": [f"{sims25[b].quantile(0.025):.2f} to {sims25[b].quantile(0.975):.2f}" for b in fund.index],
+        "actual inside": [sims25[b].quantile(0.025) <= target25[b] <= sims25[b].quantile(0.975) for b in fund.index],
+        "smallest cohort": [int(panel[(panel["board"] == b) & panel["metric"].isin(RATES) & panel["year"].isin(F.formula_window(T, "retention"))]
+                                .groupby(["metric", "year"])["den"].sum().min()) for b in fund.index],
+    }).round(2)
+    print(f"r under cohort noise, 95% range: FY 2025-26 {np.percentile(r25, 2.5):.2f} to {np.percentile(r25, 97.5):.2f}; "
+          f"FY 2026-27 {np.percentile(r26, 2.5):.2f} to {np.percentile(r26, 97.5):.2f}")
+    lo26, hi26 = sims26.quantile(0.025), sims26.quantile(0.975)
+    outside = {b: target26[b] - (hi26[b] if target26[b] > hi26[b] else lo26[b])
+               for b in fund.index if not lo26[b] <= target26[b] <= hi26[b]}
+    print(f"FY 2026-27 requests outside the cohort-noise interval: "
+          + ", ".join(f"{b} (by ${abs(v):,.0f}; interval ${lo26[b]:,.0f} to ${hi26[b]:,.0f})" for b, v in outside.items()))
+    noise
+    """),
+    md("""
+    Both fits are unlikely to be chance. Only 0.3% of the 3.6 million board
+    assignments correlate with the FY 2025-26 actuals as well as the reconstruction
+    does (exact p = 0.003), and 2.8% for the FY 2026-27 request (p = 0.028). The
+    documented windows beat every placebo: windows one to three years early give
+    correlations of 0.43 or less for FY 2025-26 and 0.01 or less for FY 2026-27.
+
+    The strength of the fit is much less certain than its existence. With ten boards
+    the FY 2025-26 interval runs from 0.39 to 0.96 (Fisher), and the FY 2026-27
+    interval reaches zero (0.00 to 0.90). MSU Denver carries part of the FY 2025-26
+    fit: without it the correlation falls to 0.63. Without Fort Lewis, FY 2026-27
+    falls to 0.55. Cohort noise alone moves the correlation within 0.64 to 0.90 for
+    FY 2025-26 and 0.21 to 0.82 for FY 2026-27.
+
+    The cohort simulation also separates the board-level misses. Adams State's and
+    Western's predicted increases are off by 0.75 and 0.5 points, but their cohorts
+    are the smallest (283 and 413 students in the thinnest board-year), and the actual
+    increase lies inside the 95% noise interval for both. Fort Lewis is the one board
+    whose actual increase lies outside it: its 0.95-point miss is more than cohort
+    noise explains, which points to a difference between SURDS and IPEDS or to an
+    adjustment outside Step 2. For FY 2026-27, the requests that fall outside the
+    interval are MSU Denver's (by about $74,000, the sign miss from above), and
+    Colorado Mesa's and Mines's, which are $24,000 to $34,000 larger than cohort noise
+    allows. Western sits on the edge (about $1,400 outside), so whether six or seven
+    boards fall inside depends on the random draw.
+
+    One caution applies to the p-values. The reconstruction's choices (pooling,
+    windows, proxies) were settled while looking at FY 2025-26, so its p-value is
+    somewhat optimistic. FY 2026-27 was not used to make any choice, which makes it
+    the cleaner test even though its fit is weaker.
 
     ## 8. What is a retention point worth?
 
@@ -838,8 +1022,10 @@ CELLS = [
 
     - **The formula is reproducible from public data, roughly.** IPEDS plus CDHE's FTE
       series recover the pattern of FY 2025-26 increases (correlation 0.82) and of the
-      FY 2026-27 request, a year the model was not tuned on (0.63). Both fits depend on
-      using the documented windows.
+      FY 2026-27 request, a year the model was not tuned on (0.63). Both are unlikely
+      to be chance (exact permutation p = 0.003 and 0.028) and beat every placebo
+      window, but with ten boards the strength of the fit is imprecise: the FY 2026-27
+      interval reaches zero.
     - **It moves little money.** About $1.1 million of $1.25 billion in FY 2025-26, and
       about $1.5 million in the FY 2026-27 request. The incentive at the margin is small.
     - **Performance is relative and front-loaded.** A board gains by improving faster than

@@ -2001,3 +2001,435 @@ select.input {
     gap: 6px;
   }
 }
+
+/* ── Funding formula lab ─────────────────────────────────────────────── */
+.legend__swatch--dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.legend__swatch--dash {
+  height: 0;
+  width: 14px;
+  border-radius: 0;
+  background: none;
+  border-top: 2px dashed var(--sw);
+}
+
+.lab {
+  display: grid;
+  grid-template-columns: minmax(16rem, 18rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.lab__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-offset);
+}
+
+.lab__group .fin__h {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.lab__sum {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.lab__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.lab__preset {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: 600 var(--text-xs) / 1 var(--font-body);
+  padding: 0.4375rem 0.75rem;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition:
+    background var(--transition-interactive),
+    color var(--transition-interactive),
+    border-color var(--transition-interactive);
+}
+
+.lab__preset:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-faint);
+}
+
+.lab__preset.is-on {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.lab__preset:focus-visible,
+.lab__w input:focus-visible,
+.lab__radio input:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.lab__weights {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.lab__w {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 4.75rem;
+  grid-template-areas:
+    "label value"
+    "range range";
+  align-items: center;
+  gap: 0.25rem var(--space-2);
+}
+
+.lab__wlabel {
+  grid-area: label;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.lab__w input[type="range"] {
+  grid-area: range;
+  width: 100%;
+  accent-color: var(--color-primary);
+  margin: 0;
+}
+
+.lab__wv {
+  grid-area: value;
+  text-align: right;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lab__eff {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.lab__fid {
+  display: inline-block;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.lab__fid--same {
+  color: var(--color-success);
+  border-color: color-mix(in oklab, var(--color-success) 40%, transparent);
+}
+
+.lab__fid--proxy {
+  color: var(--color-accent);
+  border-color: color-mix(in oklab, var(--color-accent) 45%, transparent);
+}
+
+.lab__fid--none {
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+.lab__radios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lab__radio {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: start;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+}
+
+.lab__radio:has(input:checked) {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.lab__radio input {
+  margin: 0.125rem 0 0;
+  accent-color: var(--color-primary);
+}
+
+.lab__radio strong {
+  display: block;
+  font-weight: 700;
+}
+
+.lab__radio small {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+}
+
+.lab__reward {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.lab__rrow {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) 4.5rem;
+  gap: var(--space-2);
+  align-items: center;
+  font-size: var(--text-xs);
+}
+
+.lab__rrow .mono:last-child {
+  text-align: right;
+}
+
+.lab__rbar {
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.lab__rbar span {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: inherit;
+}
+
+.lab__rnote {
+  margin-top: var(--space-2);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.lab__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.lab__stats,
+.cov__stats {
+  grid-template-columns: repeat(auto-fit, minmax(min(10.5rem, 100%), 1fr));
+  margin: 0 0 var(--space-2);
+}
+
+.lab__stats dt,
+.cov__stats dt {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.lab__stats dd,
+.cov__stats dd {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.lab__stats .fin__note,
+.cov__stats .fin__note {
+  display: block;
+  margin-top: 0.125rem;
+}
+
+.lab__box {
+  height: 21rem;
+}
+
+#lab-table th,
+#lab-table td {
+  white-space: nowrap;
+}
+
+.lab__d {
+  font-family: var(--font-mono);
+}
+
+/* ── Coverage panel ──────────────────────────────────────────────────── */
+.cov__text {
+  white-space: normal !important;
+  text-align: left !important;
+  font-family: var(--font-body) !important;
+  min-width: 12rem;
+  line-height: 1.4;
+}
+
+.cov__sources {
+  min-width: 58rem;
+}
+
+.cov__matrix {
+  min-width: 52rem;
+}
+
+.cov__matrix th {
+  white-space: normal;
+  vertical-align: bottom;
+  min-width: 5.5rem;
+}
+
+.cov__matrix .cell-name {
+  white-space: nowrap;
+}
+
+.cov__s {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.cov__s--used {
+  color: var(--color-success);
+  background: color-mix(in oklab, var(--color-success) 13%, transparent);
+}
+
+.cov__s--zero {
+  color: var(--color-error);
+  background: color-mix(in oklab, var(--color-error) 13%, transparent);
+}
+
+.cov__s--def {
+  color: var(--color-accent);
+  background: color-mix(in oklab, var(--color-accent) 16%, transparent);
+}
+
+.cov__s--miss {
+  color: var(--color-text-muted);
+  background: var(--color-surface-offset-2);
+}
+
+.cov__toggle {
+  margin-bottom: var(--space-2);
+  min-height: 2.25rem;
+}
+
+.cov__box {
+  height: 19rem;
+}
+
+@media (max-width: 900px) {
+  .lab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cov__toggle--spacer {
+    display: none;
+  }
+}
+
+#lab-table {
+  min-width: 50rem;
+  width: 100%;
+}
+
+#lab-table th,
+#lab-table td {
+  padding-inline: 0.4rem;
+  font-size: 0.75rem;
+}
+
+#lab-table .cell-name,
+.cov__sources .cell-name,
+.cov__matrix .cell-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  text-align: left;
+}
+
+.table.cov__sources thead th,
+.table.cov__matrix thead th:first-child,
+#lab-table thead th:first-child {
+  text-align: left;
+}
+
+.table.cov__matrix tbody td,
+.table.cov__matrix thead th {
+  text-align: center;
+}
+
+.table.cov__matrix tbody td.cell-name {
+  text-align: left;
+}
+
+.cov__sources td:nth-child(5) {
+  text-align: left;
+}
+
+#lab-fy {
+  white-space: nowrap;
+}
+
+/* Formula lab: fit strength */
+.lab__surewrap {
+  margin: var(--space-2) 0 var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-divider);
+}
+.lab__sureh {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  margin: 0 0 var(--space-1);
+}
+.lab__surenote {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  max-width: 78ch;
+  margin: var(--space-1) 0 0;
+}
+.lab__surenote .mono {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.legend__swatch--whisker {
+  background: none;
+  width: 12px;
+  height: 9px;
+  border-radius: 0;
+  border-left: 1.5px solid var(--sw);
+  border-right: 1.5px solid var(--sw);
+  background-image: linear-gradient(var(--sw), var(--sw));
+  background-size: 100% 1.5px;
+  background-position: center;
+  background-repeat: no-repeat;
+}

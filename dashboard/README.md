@@ -21,6 +21,8 @@ descriptive-trend baseline in `src/models/forecast_enrollment.py`.
 | `data/colorado.json`           | 13 governing boards, 29 institutions, FY2007-08 to FY2025-26        |
 | `data/colorado_finance.json`   | IPEDS finance + FTE for 27 Colorado units, FY2014-15 to FY2023-24   |
 | `data/colorado_audited.json`   | Audited CU and CSU statement lines, FY2023-24 and FY2024-25         |
+| `colorado-lab.js`              | Colorado panel: funding formula lab and IPEDS coverage panel        |
+| `data/colorado_formula.json`   | Step 2 window series, coverage status and CCCS sensitivity (nb 11)  |
 
 ## Rebuilding the data
 
@@ -289,3 +291,47 @@ cd dashboard && python3 -m http.server 8000
 - [NCES IPEDS Complete Data Files](https://nces.ed.gov/ipeds/use-the-data)
 - [Urban Institute Education Data Portal](https://educationdata.urban.org/documentation/colleges.html) (reconciliation source)
 - [Carnegie Classification](https://carnegieclassifications.acenet.edu/)
+
+### Funding formula lab and coverage panel
+
+`data/colorado_formula.json` is written by the appendix of
+`ipeds-mining/notebooks/11_colorado_performance_funding.ipynb`, so the lab and the
+notebook cannot disagree. It holds each board's four-year window series for the
+seven measurable Step 2 metrics, the inclusive (full-time plus part-time) retention
+series used for HB 26-1345, the fiscal note's Table 1, per-institution coverage
+status, and the CCCS sensitivity variants from section 10c. Window series and
+coverage status are stored once per fiscal year under `years`: FY2025-26, scored
+against the actual appropriation, and FY2026-27, scored against the request's Step 2
+formula adjustments.
+To rebuild it, run notebook 11 from `ipeds-mining/notebooks/`:
+
+```bash
+cd ipeds-mining/notebooks
+PYTHONPATH=../src jupyter nbconvert --to notebook --execute --inplace 11_colorado_performance_funding.ipynb
+```
+
+- The lab recomputes `D`, the prior-share adjustment and the weighted Step 2 share
+  in the browser (`labRun` in `colorado-lab.js`), mirroring `ipeds_utils.funding`.
+  With CDHE's weights it reproduces the notebook's reconstruction: correlation
+  0.82 with actual FY2025-26 increases (RMSE 0.45 points), and 0.63 with the
+  FY2026-27 request's dollar adjustments, a year the model was not tuned on.
+- The year switcher changes the windows, the prior shares, the comparison target
+  and the coverage matrix. The FY2026-27 Pell proxy runs a year behind the formula
+  until SFA 2024-25 is published; the footnote says so when it applies.
+- "How sure is the fit?" recomputes three checks in the browser for any weights:
+  an exact one-sided permutation test over all 10! = 3,628,800 board orderings
+  (Heap's algorithm with a constant-time dot-product update, about 40 ms), Fisher's
+  95% interval for r, and leave-one-board-out. The bootstrap interval, placebo
+  windows and cohort-noise ranges need the institution-level panel, so they come
+  from notebook 11 section 7 (`years[].strength`) and are labelled as CDHE-weight
+  results; the whiskers on the chart appear only for CDHE weights with full-time
+  retention.
+- Weights are rescaled to sum to 100. First-generation status has no IPEDS
+  equivalent, so its `D` is fixed at 1 and any weight on it goes to prior shares.
+- "Add part-time, spliced" replaces only the newest window year with the inclusive
+  rate, the mixed-definition case notebook 11 section 10d warns about.
+- Lab state is kept in the URL hash (`lab=10-5-5-20-20-20-10-10~ft&labfy=2627`),
+  so a copied link reopens the same weights, retention definition and year.
+- `tests/test_colorado_formula.py` re-runs the arithmetic on the JSON and checks it
+  against the notebook's results, including the exported permutation p, Fisher
+  interval and leave-one-out values.

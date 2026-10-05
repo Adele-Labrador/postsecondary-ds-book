@@ -16,6 +16,12 @@ from pathlib import Path
 
 import requests
 
+# NCES moved the Complete Data Files in 2026. The current path carries the newest
+# releases, including revised (``_rv``) CSVs, but only for recent collection years;
+# the legacy path still serves older years, as original releases without later
+# revisions. ``fetch`` tries the current path first and falls back to the legacy one.
+CURRENT_DATA_URL = "https://nces.ed.gov/ipeds/complete-data-files/{table}.zip"
+CURRENT_DICT_URL = "https://nces.ed.gov/ipeds/complete-data-files/{table}_Dict.zip"
 DATA_URL = "https://nces.ed.gov/ipeds/datacenter/data/{table}.zip"
 DICT_URL = "https://nces.ed.gov/ipeds/datacenter/data/{table}_Dict.zip"
 
@@ -40,6 +46,17 @@ def _get(url: str, timeout: int = DEFAULT_TIMEOUT) -> bytes:
     return response.content
 
 
+def _get_first(urls: list[str]) -> tuple[bytes, str]:
+    """Return the first archive that downloads, and the URL it came from."""
+    errors = []
+    for url in urls:
+        try:
+            return _get(url), url
+        except FetchError as err:
+            errors.append(str(err))
+    raise FetchError("; ".join(errors))
+
+
 def fetch(table: str, raw_dir: str | Path = "data/raw", *, refresh: bool = False) -> dict:
     """Download one IPEDS table plus its dictionary and record provenance.
 
@@ -62,6 +79,11 @@ def fetch(table: str, raw_dir: str | Path = "data/raw", *, refresh: bool = False
 
     Notes
     -----
+    Downloads try NCES's current ``complete-data-files`` path first, then the legacy
+    ``datacenter/data`` path; ``data_url`` and ``dict_url`` record the one that
+    answered. A cached archive is reused as-is, so pass ``refresh=True`` to pick up
+    a revision published since it was downloaded.
+
     A few tables have no published dictionary. That is recorded as
     ``dict_path: None`` rather than raised, because the CSV is still usable; the
     caller simply cannot schema-lock against official labels.
@@ -75,10 +97,12 @@ def fetch(table: str, raw_dir: str | Path = "data/raw", *, refresh: bool = False
         "data_url": DATA_URL.format(table=table),
         "dict_url": DICT_URL.format(table=table),
     }
+    data_urls = [CURRENT_DATA_URL.format(table=table), DATA_URL.format(table=table)]
+    dict_urls = [CURRENT_DICT_URL.format(table=table), DICT_URL.format(table=table)]
 
     data_path = raw_dir / f"{table}.zip"
     if refresh or not data_path.exists():
-        payload = _get(record["data_url"])
+        payload, record["data_url"] = _get_first(data_urls)
         data_path.write_bytes(payload)
     record["data_path"] = str(data_path)
     record["data_sha256"] = _sha256(data_path)
@@ -87,7 +111,8 @@ def fetch(table: str, raw_dir: str | Path = "data/raw", *, refresh: bool = False
     dict_path = raw_dir / f"{table}_Dict.zip"
     if refresh or not dict_path.exists():
         try:
-            dict_path.write_bytes(_get(record["dict_url"]))
+            payload, record["dict_url"] = _get_first(dict_urls)
+            dict_path.write_bytes(payload)
         except FetchError:
             dict_path = None
     if dict_path is not None and dict_path.exists():

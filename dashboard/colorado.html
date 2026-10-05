@@ -77,6 +77,10 @@
           </p>
         </div>
         <div class="header__actions">
+          <a class="btn btn--ghost" href="#lab" id="lab-jump" hidden
+            ><span class="hide-sm">Formula lab</span
+            ><span class="show-sm">Lab</span></a
+          >
           <a class="btn btn--ghost" href="#fin" id="fin-jump" hidden
             ><span class="hide-sm">Campus finances</span
             ><span class="show-sm">Finances</span></a
@@ -176,6 +180,151 @@
               <tbody id="co-tbody"></tbody>
             </table>
           </div>
+        </section>
+
+        <section class="card" id="lab" hidden>
+          <div class="card__head card__head--wrap">
+            <div>
+              <h2 class="card__title">
+                Funding formula lab · <span id="lab-fy">FY2025-26</span>
+                <span class="tag aud__badge">Public-data reconstruction</span>
+              </h2>
+              <p class="card__sub" id="lab-sub">
+                Re-run Step 2 with your own weights and metric definitions
+              </p>
+            </div>
+            <div class="co-controls co-controls--inline">
+              <div
+                class="seg"
+                role="radiogroup"
+                aria-label="Fiscal year"
+                id="lab-years"
+              ></div>
+              <button class="btn btn--ghost" id="lab-copy" type="button">
+                Copy link
+              </button>
+              <button class="btn btn--ghost" id="lab-reset" type="button">
+                Reset
+              </button>
+            </div>
+          </div>
+          <div class="lab">
+            <div class="lab__controls">
+              <div class="lab__group">
+                <h3 class="fin__h">Presets</h3>
+                <div class="lab__presets" id="lab-presets"></div>
+              </div>
+              <div class="lab__group">
+                <h3 class="fin__h">
+                  Metric weights
+                  <span class="lab__sum mono" id="lab-sum"></span>
+                </h3>
+                <div class="lab__weights" id="lab-weights"></div>
+              </div>
+              <div class="lab__group">
+                <h3 class="fin__h">Retention definition</h3>
+                <div
+                  class="lab__radios"
+                  role="radiogroup"
+                  aria-label="Retention definition"
+                  id="lab-ret"
+                ></div>
+              </div>
+              <div class="lab__group">
+                <h3 class="fin__h">A lasting 1% gain earns</h3>
+                <div class="lab__reward" id="lab-reward"></div>
+              </div>
+            </div>
+            <div class="lab__results">
+              <dl class="fin__stats lab__stats" id="lab-stats"></dl>
+              <div class="lab__surewrap">
+                <h4 class="lab__sureh">How sure is the fit?</h4>
+                <div id="lab-sure" aria-live="polite"></div>
+              </div>
+              <div class="legend" id="lab-legend"></div>
+              <div class="chartbox lab__box">
+                <canvas id="lab-chart"></canvas>
+              </div>
+              <div class="tablewrap">
+                <table class="table" id="lab-table">
+                  <thead></thead>
+                  <tbody id="lab-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <p class="card__foot" id="lab-foot"></p>
+        </section>
+
+        <section class="card" id="cov" hidden>
+          <div class="card__head card__head--wrap">
+            <div>
+              <h2 class="card__title">What IPEDS can&rsquo;t see</h2>
+              <p class="card__sub">
+                Which formula inputs public data can rebuild, and where the
+                community-college picture breaks down
+              </p>
+            </div>
+            <div class="co-controls co-controls--inline">
+              <label class="sel">
+                <span>Board</span>
+                <select id="cov-board" class="input input--sm"></select>
+              </label>
+            </div>
+          </div>
+          <dl class="fin__stats cov__stats" id="cov-stats"></dl>
+          <div class="tablewrap">
+            <table class="table cov__sources" id="cov-sources">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="card__foot" id="cov-src-note"></p>
+          <div>
+            <h3 class="fin__h" id="cov-matrix-h">
+              Institutions in the FY2025-26 reconstruction
+            </h3>
+            <div class="legend" id="cov-legend"></div>
+            <div class="tablewrap">
+              <table class="table cov__matrix" id="cov-matrix">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="grid2 grid2--flush">
+            <div>
+              <h3 class="fin__h">CCCS retention cohort IPEDS reports</h3>
+              <div class="cov__toggle">
+                <div class="seg" role="radiogroup" aria-label="Cohort">
+                  <button class="seg__btn" data-cov-cohort="ft" role="radio">
+                    Full-time
+                  </button>
+                  <button class="seg__btn" data-cov-cohort="pt" role="radio">
+                    Part-time
+                  </button>
+                </div>
+              </div>
+              <div class="legend" id="cov-trap-legend"></div>
+              <div class="chartbox cov__box">
+                <canvas id="cov-trap"></canvas>
+              </div>
+            </div>
+            <div>
+              <h3 class="fin__h">
+                CCCS part-time effect under HB 26-1345, by sample
+              </h3>
+              <div
+                class="cov__toggle cov__toggle--spacer"
+                aria-hidden="true"
+              ></div>
+              <div class="legend" id="cov-sens-legend"></div>
+              <div class="chartbox cov__box">
+                <canvas id="cov-sens"></canvas>
+              </div>
+            </div>
+          </div>
+          <p class="card__foot" id="cov-foot"></p>
         </section>
 
         <section class="card" id="fin">
@@ -337,7 +486,12 @@
       <p class="loading__text">Loading Colorado panel…</p>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
+      integrity="sha384-JUh163oCRItcbPme8pYnROHQMC6fNKTBWtRG3I3I0erJkzNgL7uxKlNwcrcFKeqF"
+      crossorigin="anonymous"
+    ></script>
+    <script src="colorado-lab.js"></script>
     <script src="colorado.js"></script>
   </body>
 </html>

@@ -118,3 +118,58 @@ def test_coverage_units(lab):
     # Colorado Northwestern reports no full-time cohort for fall 2023, so FY2026-27 keeps five.
     later = year(lab, "FY 2026-27")["status"]
     assert sum(later[str(u)]["retention"] == "used" for u in cccs) == 5
+
+
+def fit_vectors(lab: dict, label: str) -> tuple[list[float], list[float]]:
+    # The lab's fit: % increase vs actual for FY2025-26, dollar adjustment vs request for FY2026-27.
+    y = year(lab, label)
+    s = shares(lab, label)
+    boards = y["boards"]
+    if y["target"] == "actual":
+        pot = sum(b["target"] for b in boards.values())
+        model = [(s[k] * pot / b["base"] - 1) * 100 for k, b in boards.items()]
+        target = [(b["target"] / b["base"] - 1) * 100 for b in boards.values()]
+    else:
+        pot = sum(b["base"] for b in boards.values())
+        model = [s[k] * pot - b["base"] for k, b in boards.items()]
+        target = [b["target"] - b["base"] for b in boards.values()]
+    return model, target
+
+
+@pytest.mark.parametrize("label", ["FY 2025-26", "FY 2026-27"])
+def test_fit_strength_recomputes(lab, label):
+    # Notebook 11 section 7 checks, recomputed from the exported series: the exact
+    # permutation p over all 10! orderings, Fisher's interval and leave-one-out.
+    import math
+    from itertools import permutations
+
+    import numpy as np
+
+    st = year(lab, label)["strength"]
+    x, y = (np.array(v) for v in fit_vectors(lab, label))
+    r = corr(list(x), list(y))
+    assert r == pytest.approx(st["r"], abs=1e-3)
+
+    xs, ys = (x - x.mean()) / x.std(), (y - y.mean()) / y.std()
+    obs = float(xs @ ys)
+    hits = total = 0
+    it = permutations(range(10))
+    while block := [p for _, p in zip(range(500_000), it)]:
+        dots = ys[np.array(block)] @ xs
+        hits += int((dots >= obs - 1e-9).sum())
+        total += len(block)
+    assert total == math.factorial(10) == st["permutations"]
+    # The exported series are rounded, so a few orderings near the threshold can flip.
+    assert hits / total == pytest.approx(st["p"], abs=1e-4)
+
+    z, se = math.atanh(r), 1 / math.sqrt(7)
+    assert [math.tanh(z - 1.96 * se), math.tanh(z + 1.96 * se)] == pytest.approx(
+        st["fisher"], abs=2e-3
+    )
+    for i, k in enumerate(year(lab, label)["boards"]):
+        keep = [j for j in range(10) if j != i]
+        assert corr(list(x[keep]), list(y[keep])) == pytest.approx(st["leaveOneOut"][k], abs=2e-3)
+    for lo, hi in st["noisePct"].values():
+        assert lo < hi
+    assert st["noiseR"][0] < st["r"] < st["noiseR"][1]
+    assert max(st["placebo"]) < st["r"]

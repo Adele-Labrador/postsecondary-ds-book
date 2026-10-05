@@ -318,6 +318,14 @@ PYTHONPATH=../src jupyter nbconvert --to notebook --execute --inplace 11_colorad
 - The year switcher changes the windows, the prior shares, the comparison target
   and the coverage matrix. The FY2026-27 Pell proxy runs a year behind the formula
   until SFA 2024-25 is published; the footnote says so when it applies.
+- "How sure is the fit?" recomputes three checks in the browser for any weights:
+  an exact one-sided permutation test over all 10! = 3,628,800 board orderings
+  (Heap's algorithm with a constant-time dot-product update, about 40 ms), Fisher's
+  95% interval for r, and leave-one-board-out. The bootstrap interval, placebo
+  windows and cohort-noise ranges need the institution-level panel, so they come
+  from notebook 11 section 7 (`years[].strength`) and are labelled as CDHE-weight
+  results; the whiskers on the chart appear only for CDHE weights with full-time
+  retention.
 - Weights are rescaled to sum to 100. First-generation status has no IPEDS
   equivalent, so its `D` is fixed at 1 and any weight on it goes to prior shares.
 - "Add part-time, spliced" replaces only the newest window year with the inclusive
@@ -325,4 +333,5 @@ PYTHONPATH=../src jupyter nbconvert --to notebook --execute --inplace 11_colorad
 - Lab state is kept in the URL hash (`lab=10-5-5-20-20-20-10-10~ft&labfy=2627`),
   so a copied link reopens the same weights, retention definition and year.
 - `tests/test_colorado_formula.py` re-runs the arithmetic on the JSON and checks it
-  against the notebook's results.
+  against the notebook's results, including the exported permutation p, Fisher
+  interval and leave-one-out values.

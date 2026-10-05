@@ -507,7 +507,7 @@ CELLS = [
         "FY 2025-26 vs actual": (fit25(D), target25, fit25, T),
         "FY 2026-27 vs request": (fit26(D2), target26, fit26, T2),
     }
-    rows = []
+    rows, strength_num = [], {}
     for label, (pred_x, y, fn, fy) in years_fit.items():
         r = r_of(pred_x, y)
         p_perm, n_perm = exact_perm_p(pred_x, y)
@@ -519,6 +519,12 @@ CELLS = [
                 boot.append(r_of(pred_x.iloc[idx], y.iloc[idx]))
         loo = [r_of(pred_x.drop(b), y.drop(b)) for b in y.index]
         placebo = [r_of(fn(board_d(fy, shift=-k)[0]), y) for k in (1, 2, 3)]
+        strength_num[fy] = {
+            "r": r, "p": p_perm, "permutations": n_perm,
+            "fisher": [float(np.tanh(z - 1.96 * se)), float(np.tanh(z + 1.96 * se))],
+            "bootstrap": [float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))],
+            "leaveOneOut": dict(zip(y.index, loo)), "placebo": placebo,
+        }
         rows.append({
             "fit": label, "r": r, "exact permutation p": p_perm,
             "Fisher 95% CI": f"{np.tanh(z - 1.96 * se):.2f} to {np.tanh(z + 1.96 * se):.2f}",
@@ -578,6 +584,12 @@ CELLS = [
         r25.append(r_of(p25, target25))
         r26.append(r_of(p26, target26))
     sims25, sims26 = pd.DataFrame(sims25), pd.DataFrame(sims26)
+    for fy, sims, rs, base_fy in ((T, sims25, r25, None), (T2, sims26, r26, base2)):
+        pct_sims = sims if base_fy is None else sims / base_fy * 100  # FY 2026-27: dollars to % of base
+        strength_num[fy]["noiseR"] = [float(np.percentile(rs, 2.5)), float(np.percentile(rs, 97.5))]
+        strength_num[fy]["noisePct"] = {b: [float(pct_sims[b].quantile(0.025)), float(pct_sims[b].quantile(0.975))]
+                                        for b in fund.index}
+        strength_num[fy]["draws"] = len(rs)
 
     noise = pd.DataFrame({
         "actual %": target25,
@@ -1066,7 +1078,9 @@ CELLS = [
     so the dashboard and this notebook cannot disagree. The cell writes
     `dashboard/data/colorado_formula.json` when the notebook runs inside the parent
     repository and checks that the exported window series reproduce the `D` ratios
-    of section 6 (FY 2025-26) and section 7's second test (FY 2026-27) exactly.
+    of section 6 (FY 2025-26) and section 7's second test (FY 2026-27) exactly. It
+    also carries section 7's fit checks for CDHE's weights, which the lab shows
+    beside the results it recomputes for any weights.
     """),
     code(r"""
     import datetime as dt
@@ -1090,6 +1104,17 @@ CELLS = [
 
     def num(v, places=6):
         return None if pd.isna(v) else round(float(v), places)
+
+
+    def strength_out(fy_start):
+        st = strength_num[fy_start]
+        return {
+            "r": num(st["r"], 4), "p": num(st["p"], 6), "permutations": st["permutations"],
+            "fisher": [num(v, 4) for v in st["fisher"]], "bootstrap": [num(v, 4) for v in st["bootstrap"]],
+            "leaveOneOut": {b: num(v, 4) for b, v in st["leaveOneOut"].items()},
+            "placebo": [num(v, 4) for v in st["placebo"]], "noiseR": [num(v, 4) for v in st["noiseR"]],
+            "noisePct": {b: [num(v, 4) for v in iv] for b, iv in st["noisePct"].items()}, "draws": st["draws"],
+        }
 
 
     def export_year(fy_start, d_check, target, target_kind, pct_check):
@@ -1118,7 +1143,7 @@ CELLS = [
         return {
             "fiscalYear": F.fiscal_year_label(fy_start), "baseYear": F.fiscal_year_label(fy_start - 1),
             "target": target_kind, "windows": {m: [str(y) for y in w] for m, w in windows.items()},
-            "lagged": lagged, "retentionYears": ret_years,
+            "lagged": lagged, "retentionYears": ret_years, "strength": strength_out(fy_start),
             "boards": {b: {
                 "base": float(base_fy[b]), "target": float(target[b]),
                 "series": {m: [num(v) for v in series[m].loc[b]] for m in series},

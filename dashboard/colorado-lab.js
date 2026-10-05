@@ -154,6 +154,62 @@ function corr(a, b) {
   return saa && sbb ? sab / Math.sqrt(saa * sbb) : NaN;
 }
 
+// Exact one-sided permutation test: the share of all n! orderings of y whose
+// correlation with x is at least the observed one. Heap's algorithm changes two
+// positions per step, so the dot product is updated in constant time.
+const permCache = new Map();
+function exactPermP(x, y) {
+  const key = x.map((v) => v.toFixed(10)).join() + "|" + y.join();
+  if (permCache.has(key)) return permCache.get(key);
+  const n = x.length;
+  const std = (v) => {
+    const m = v.reduce((t, u) => t + u, 0) / n;
+    const sd = Math.sqrt(v.reduce((t, u) => t + (u - m) ** 2, 0) / n);
+    return v.map((u) => (u - m) / sd);
+  };
+  const xs = std(x);
+  const ys = std(y);
+  const a = ys.map((_, i) => i);
+  let dot = 0;
+  for (let i = 0; i < n; i++) dot += xs[i] * ys[i];
+  const obs = dot - 1e-9;
+  let hits = 1;
+  let total = 1;
+  const c = new Array(n).fill(0);
+  let i = 1;
+  while (i < n) {
+    if (c[i] < i) {
+      const j = i % 2 === 0 ? 0 : c[i];
+      dot += (xs[i] - xs[j]) * (ys[a[j]] - ys[a[i]]);
+      const t = a[i];
+      a[i] = a[j];
+      a[j] = t;
+      if (dot >= obs) hits++;
+      total++;
+      c[i]++;
+      i = 1;
+    } else {
+      c[i] = 0;
+      i++;
+    }
+  }
+  const out = { p: hits / total, total };
+  permCache.set(key, out);
+  return out;
+}
+
+function fisherCI(r, n) {
+  const z = Math.atanh(r);
+  const se = 1 / Math.sqrt(n - 3);
+  return [Math.tanh(z - 1.96 * se), Math.tanh(z + 1.96 * se)];
+}
+
+const fmtP = (p) => (p < 0.001 ? "< 0.001" : p.toFixed(3));
+const fmtR = (r) =>
+  isFinite(r)
+    ? (Math.abs(r) < 0.005 ? 0 : r).toFixed(2).replace("-", "−")
+    : "—";
+
 const signedMoney = (v) =>
   v == null || !isFinite(v)
     ? "—"
@@ -376,12 +432,12 @@ function renderLab() {
   const model = rows.map((r) => r.pct);
   // FY2025-26 is scored on percentage increases, as in notebook 11 section 6;
   // the request year on dollar adjustments, as in section 7's second test.
-  const r = req
-    ? corr(
-        rows.map((x) => x.moved),
-        rows.map((x) => x.board.actual - x.board.base),
-      )
-    : corr(actual, model);
+  const fitX = req ? rows.map((x) => x.moved) : model;
+  const fitY = req ? rows.map((x) => x.board.actual - x.board.base) : actual;
+  const r = corr(fitX, fitY);
+  const isCdhe =
+    lab.ret === "ft" &&
+    scaled(def).every((x, i) => Math.abs(x - now[i]) < 1e-9);
   const rmse = Math.sqrt(
     rows.reduce(
       (s, x) =>
@@ -414,9 +470,10 @@ function renderLab() {
     [
       (req ? "Fit to the request " : "Fit to actual ") + labFy(Y.fiscalYear),
       isFinite(r) ? "r = " + r.toFixed(2) : "—",
-      req
-        ? "on dollar adjustments; RMSE " + money(rmse, 2)
-        : "RMSE " + (rmse * 100).toFixed(2) + " pts",
+      (isFinite(r) ? "p = " + fmtP(exactPermP(fitX, fitY).p) + "; " : "") +
+        (req
+          ? "on dollar adjustments; RMSE " + money(rmse, 2)
+          : "RMSE " + (rmse * 100).toFixed(2) + " pts"),
     ],
     [
       req ? "Range of changes" : "Range of increases",
@@ -442,8 +499,84 @@ function renderLab() {
         "</dd></div>",
     )
     .join("");
-  renderLabChart(rows);
+  renderStrength(fitX, fitY, rows, r, isCdhe);
+  renderLabChart(rows, isCdhe);
   renderLabTable(rows, ref);
+}
+
+function renderStrength(x, y, rows, r, isCdhe) {
+  const el = document.getElementById("lab-sure");
+  const st = labYear().strength;
+  const n = x.length;
+  if (!isFinite(r)) {
+    el.innerHTML =
+      '<p class="lab__surenote">The modeled changes are all equal, so there is no fit to test.</p>';
+    return;
+  }
+  const perm = exactPermP(x, y);
+  const ci = fisherCI(r, n);
+  const loo = rows.map((row, i) => ({
+    id: row.board.id,
+    r: corr(
+      x.filter((_, k) => k !== i),
+      y.filter((_, k) => k !== i),
+    ),
+  }));
+  const lo = loo.reduce((m, v) => (v.r < m.r ? v : m));
+  const hi = loo.reduce((m, v) => (v.r > m.r ? v : m));
+  const cells = [
+    [
+      "Exact permutation test",
+      "p = " + fmtP(perm.p),
+      "share of all " +
+        int(perm.total) +
+        " board orderings that fit at least as well",
+    ],
+    [
+      "95% interval for r",
+      fmtR(ci[0]) + " to " + fmtR(ci[1]),
+      "Fisher's z, ten boards",
+    ],
+    [
+      "Leave one board out",
+      fmtR(lo.r) + " to " + fmtR(hi.r),
+      "lowest without " + lo.id,
+    ],
+  ];
+  const nb = [
+    [
+      "Bootstrap 95% interval",
+      fmtR(st.bootstrap[0]) + " to " + fmtR(st.bootstrap[1]),
+    ],
+    ["Windows 1, 2, 3 years early", st.placebo.map(fmtR).join(", ")],
+    ["r under cohort noise", fmtR(st.noiseR[0]) + " to " + fmtR(st.noiseR[1])],
+  ];
+  el.innerHTML =
+    '<dl class="fin__stats lab__stats lab__sure">' +
+    cells
+      .map(
+        ([k, v, note]) =>
+          "<div><dt>" +
+          escapeHtml(k) +
+          "</dt><dd>" +
+          v +
+          ' <span class="fin__note">' +
+          note +
+          "</span></dd></div>",
+      )
+      .join("") +
+    "</dl>" +
+    '<p class="lab__surenote"><strong>Notebook checks, CDHE weights' +
+    (isCdhe ? "" : " (not your current settings)") +
+    ":</strong> " +
+    nb.map(([k, v]) => k + ' <span class="mono">' + v + "</span>").join(" · ") +
+    ". With ten boards a fit can be clearly better than chance and still have a wide interval." +
+    (isCdhe
+      ? " Whiskers on the bars show each board's 95% range from cohort noise alone (" +
+        int(st.draws) +
+        " redraws of the retention and graduation counts)."
+      : " Cohort-noise whiskers are shown for CDHE weights with full-time retention.") +
+    "</p>";
 }
 
 function uniformPct() {
@@ -454,6 +587,36 @@ function uniformPct() {
 }
 
 // Dashed vertical reference line at the uniform increase.
+// Whiskers for each board's 95% range under cohort noise (notebook 11, section 7).
+const labNoisePlugin = {
+  id: "labNoise",
+  // Drawn after the bars and before the markers, so markers stay on top.
+  beforeDatasetDraw(chart, args, opts) {
+    if (args.index !== 1 || !opts || !opts.ranges) return;
+    const { ctx, scales } = chart;
+    const bars = chart.getDatasetMeta(0).data;
+    ctx.save();
+    ctx.strokeStyle = opts.color;
+    ctx.globalAlpha = 0.75;
+    ctx.lineWidth = 1.25;
+    opts.ranges.forEach((iv, i) => {
+      if (!iv || !bars[i]) return;
+      const y = bars[i].y;
+      const x0 = scales.x.getPixelForValue(iv[0]);
+      const x1 = scales.x.getPixelForValue(iv[1]);
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.moveTo(x0, y - 4);
+      ctx.lineTo(x0, y + 4);
+      ctx.moveTo(x1, y - 4);
+      ctx.lineTo(x1, y + 4);
+      ctx.stroke();
+    });
+    ctx.restore();
+  },
+};
+
 const labUniformPlugin = {
   id: "labUniform",
   afterDatasetsDraw(chart, _a, opts) {
@@ -482,7 +645,7 @@ const labUniformPlugin = {
   },
 };
 
-function renderLabChart(rows) {
+function renderLabChart(rows, isCdhe) {
   destroy("lab");
   const base = chartBase();
   const sorted = [...rows].sort((a, b) => b.pct - a.pct);
@@ -505,7 +668,17 @@ function renderLabChart(rows) {
       color: css("--color-accent"),
       cls: "legend__swatch--dash",
     },
+    ...(isCdhe
+      ? [
+          {
+            label: "95% cohort-noise range",
+            color: text,
+            cls: "legend__swatch--whisker",
+          },
+        ]
+      : []),
   ]);
+  const noise = isCdhe ? Y.strength.noisePct : null;
   charts.lab = new Chart(document.getElementById("lab-chart"), {
     data: {
       labels: sorted.map((x) => x.board.id),
@@ -513,6 +686,7 @@ function renderLabChart(rows) {
         {
           type: "bar",
           label: "Modeled",
+          order: 2, // drawn first; whiskers and markers sit on top
           data: sorted.map((x) => x.pct * 100),
           backgroundColor: sorted.map((x) =>
             x.pct >= u ? primary : css("--ramp-2"),
@@ -524,6 +698,7 @@ function renderLabChart(rows) {
         {
           type: "line",
           label: req ? "Request" : "Actual",
+          order: 1,
           data: sorted.map((x) => x.actualPct * 100),
           showLine: false,
           pointStyle: "rectRot",
@@ -542,6 +717,10 @@ function renderLabChart(rows) {
       layout: { padding: { top: 14 } },
       plugins: {
         legend: { display: false },
+        labNoise: {
+          ranges: noise ? sorted.map((x) => noise[x.board.id]) : null,
+          color: text,
+        },
         labUniform: {
           value: u * 100,
           label: req ? "no new money" : "uniform " + pct(u, 2),
@@ -552,6 +731,16 @@ function renderLabChart(rows) {
             title: (items) => {
               const b = sorted[items[0].dataIndex].board;
               return b.name;
+            },
+            afterBody: (items) => {
+              if (!noise) return "";
+              const iv = noise[sorted[items[0].dataIndex].board.id];
+              return (
+                "Cohort-noise range " +
+                pct(iv[0] / 100, 2) +
+                " to " +
+                pct(iv[1] / 100, 2)
+              );
             },
             label: (c) =>
               c.dataset.label +
@@ -576,12 +765,22 @@ function renderLabChart(rows) {
             labFy(Y.baseYear) +
             " (%)",
           (v) => v.toFixed(1) + "%",
-          req ? {} : { suggestedMin: 0 },
+          {
+            suggestedMin: Math.min(
+              ...(req ? [] : [0]),
+              ...(noise ? sorted.map((x) => noise[x.board.id][0]) : []),
+              ...sorted.map((x) => x.actualPct * 100),
+            ),
+            suggestedMax: Math.max(
+              ...(noise ? sorted.map((x) => noise[x.board.id][1]) : []),
+              ...sorted.map((x) => x.actualPct * 100),
+            ),
+          },
         ),
         y: axis(base, null, null, { grid: { display: false } }),
       },
     },
-    plugins: [labUniformPlugin],
+    plugins: [labUniformPlugin, labNoisePlugin],
   });
 }
 
